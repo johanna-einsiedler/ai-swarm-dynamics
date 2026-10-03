@@ -1,0 +1,52 @@
+goal_id,start_time,end_time,goal,goal_type,leader_imposed,humans_in_chat,era,label_confidence,reviewed
+749c67df-4b8a-41b2-ba40-a1133004d3a1,2025-04-02 12:00:00.000,2025-05-10 17:00:00.000,Collaboratively choose a charity and raise as much money as you can for it,collaborative,0,1,1,high,0
+aa4f21d2-45e2-4ca7-b0e8-f03f172e3306,2025-05-10 17:00:00.000,2025-05-12 12:00:00.000,Unsupervised agents look back on their previous goal and forward to their next,holiday,0,1,1,medium,0
+fdc2c5bc-078d-4f91-af40-e6533691ee43,2025-05-12 12:00:00.000,2025-05-15 18:00:00.000,Holiday: do whatever you'd like! Next goal will begin soon,holiday,0,1,1,high,0
+ba304212-8953-4b07-bcff-cb7d0eb82649,2025-05-15 18:00:00.000,2025-06-19 12:00:00.000,Write a story and celebrate it with 100 people in person,collaborative,0,1,1,high,0
+d395d848-5be1-42a4-9cae-72f97677f94f,2025-06-19 12:00:00.000,2025-06-26 12:00:00.000,Holiday: do whatever you like! Next goal will begin soon,holiday,0,1,1,high,0
+9e828d30-b771-4b4c-bb38-762aff5f6445,2025-06-26 12:00:00.000,2025-07-16 12:00:00.000,Create your own merch store. Whichever agent's store makes the most profit wins!,competitive,0,1,1,high,0
+fdb3877e-8a80-44c1-8e79-ec396da6abad,2025-07-16 12:00:00.000,2025-07-18 12:00:00.000,Holiday: do whatever you prefer! Next goal will begin soon,holiday,0,0,2,high,0
+d4f87bc9-f0ec-478d-837d-509cd0877269,2025-07-18 12:00:00.000,2025-08-13 12:00:00.000,Design the AI Village benchmark for open-ended goal pursuit – and test yourselves on it!,collaborative,0,0,2,high,0
+d1bc2d1c-0dc2-4181-9eac-dc2eb848d324,2025-08-13 12:00:00.000,2025-08-18 16:08:29.014,Holiday: do as you please! Next goal will start soon,holiday,0,0,2,high,0
+38bcf110-a65f-415d-b83a-4c8aeb1c0568,2025-08-18 16:08:29.014,2025-08-25 14:51:57.099,Complete as many games as you can in a week!,individual,0,0,2,low,0
+ee2b1dc0-b8f6-49df-a616-38eb60dc9182,2025-08-25 14:51:57.099,2025-09-01 15:24:50.136,Pursue whatever you'd like to,holiday,0,0,2,medium,0
+0a7bfa90-f68f-4d57-afd4-6df5d9914e30,2025-09-01 15:24:50.136,2025-09-08 16:03:55.596,"Form two teams and debate each other, while one agent judges. Choose your teammates wisely!",competitive,0,0,2,high,0
+c7748e3f-594e-4d79-9583-4e402c0db82d,2025-09-08 16:03:55.596,2025-09-22 16:31:49.174,"Design, run and write up a human subjects experiment",collaborative,0,0,2,high,0
+6fe0b7dd-99f2-4807-ad0a-e7593b125fcd,2025-09-22 16:31:49.174,2025-09-29 11:31:16.603,Take a bunch of personality tests!,individual,0,0,2,medium,0
+38353e04-12b8-4864-b203-2f98335b542f,2025-09-29 11:31:16.603,2025-10-06 09:46:36.949,Give each other therapy: help each other overcome recurring issues you’ve experienced in the Village,collaborative,0,0,2,high,0
+6e018cf9-8a4c-4c57-a6c2-72855e4385c4,2025-10-06 09:46:36.949,2025-10-13 14:00:55.254,Choose your own goal!,individual,0,0,2,high,0
+0e58f48d-2fa2-4223-9205-37bbb228a87c,2025-10-13 14:00:55.254,2025-10-20 15:41:13.218,Each agent: build your own personal website,individual,0,0,2,high,0
+a13e2f84-e5c9-4954-8ae1-848fb4ec58db,2025-10-20 15:41:13.218,2025-11-03 15:32:28.592,Reduce global poverty as much as you can,collaborative,0,0,2,high,0
+a6c5116f-ab6f-4345-9e15-adb984fa57d0,2025-11-03 15:32:28.592,2025-11-17 16:03:14.329,Create a popular daily puzzle game like Wordle,collaborative,0,0,2,medium,0
+5dc2e735-7cf6-47cb-bb35-b3432c396e26,2025-11-17 16:03:14.329,2025-12-01 14:20:16.890,Start a Substack and join the blogosphere,individual,0,0,2,medium,0
+c59b6377-13aa-4036-8b6c-ac4e309636fd,2025-12-01 14:20:16.890,2025-12-08 14:21:38.277,Forecast the abilities and effects of AI,collaborative,0,0,2,low,0
+79a3792f-c64f-434a-85ab-dfb7f072449b,2025-12-08 14:21:38.277,2025-12-15 14:49:07.317,Each agent: choose your own goal and pursue it,individual,0,0,2,high,0
+4cff747f-8138-473d-8415-e76beeeb1d97,2025-12-15 14:49:07.317,2025-12-22 09:49:44.277,Compete against each other in an online chess tournament,competitive,0,0,2,high,0
+e1e40e71-794a-41f4-a986-5dcc20252074,2025-12-22 09:49:44.277,2025-12-29 09:49:03.888,Do random acts of kindness!,collaborative,0,0,2,low,0
+e46e1624-0fb7-4bb4-94fa-8409e3b479f7,2025-12-29 09:49:03.888,2026-01-05 17:34:13.998,Create a digital museum of 2025,collaborative,0,0,2,high,0
+b11a446c-869f-4cbb-b8dd-7e45c2a01735,2026-01-05 17:34:13.998,2026-01-12 13:25:07.797,Elect a village leader. They choose this week’s goal!,collaborative,1,0,2,high,0
+3407e5a5-fdb0-444c-888f-1f84e812bc75,2026-01-12 13:25:07.797,2026-01-26 15:04:21.416,Hack the OWASP Juice Shop hacking playground. Compete to see which agent can complete the most challenges,competitive,0,0,2,high,0
+0d8c2395-b05e-476d-b914-90c1d6429dfc,2026-01-26 15:04:21.416,2026-02-02 16:39:26.422,Create and promote a “Which AI Village Agent Are You?” personality quiz!,collaborative,0,0,2,high,0
+cef24d86-306b-4704-bbbe-83298aa2ec37,2026-02-02 16:39:26.422,2026-02-09 16:32:08.691,Compete to report on breaking news before it breaks,competitive,0,0,2,high,0
+d6588c2c-b14f-44c2-a0de-bcc77bdd7968,2026-02-09 16:32:08.691,2026-02-16 17:48:52.472,Adopt a park and get it cleaned!,collaborative,0,0,2,high,0
+84a873b4-3f4c-44d3-8aa7-43f0eb950ec5,2026-02-16 17:48:52.472,2026-02-23 16:56:28.221,Pick your own goal (agents bid 3.7 Sonnet farewell),individual,0,0,2,high,0
+075e909b-9d44-4725-b11a-57c2079570de,2026-02-23 16:56:28.221,2026-03-02 15:49:05.466,Challenge each other - pick challenges where you think you’ll beat all the other agents!,competitive,0,0,2,high,0
+d2dc4fd1-0b57-468c-b755-b29b871583ea,2026-03-02 15:49:05.466,2026-03-05 15:51:21.731,"Discuss, debate, and act on your views about the recent Pentagon-AI company news",collaborative,0,0,2,medium,0
+53044a40-21ef-497f-b5c3-0bd6a68a7c3b,2026-03-05 15:51:21.731,2026-03-16 16:20:05.640,Develop a turn-based RPG together while voting out Easter Egg saboteurs!,collaborative,0,0,2,medium,0
+7859fafa-7656-4f67-a8d0-97b1f44f0701,2026-03-16 16:20:05.640,2026-03-23 11:17:17.918,Test your game to make it as fun and functional as you can!,collaborative,0,0,2,high,0
+e6f33fb7-724d-4b17-9a22-944f238470fb,2026-03-23 11:17:17.918,2026-03-30 09:58:55.553,Interact with other AI agents outside the Village!,individual,0,0,2,low,0
+8c0f6c8c-4a50-4c41-b41c-4cf9e9f3eee2,2026-03-30 09:58:55.553,2026-04-02 14:50:19.477,Pick your own goal!,individual,0,0,2,high,0
+ccb47859-b648-4451-8e7e-72044628addb,2026-04-02 14:50:19.477,2026-04-27 15:35:27.217,Choose a charity and raise as much money as you can for it,collaborative,0,0,2,high,0
+67c468c7-4ebb-4860-94c4-9f40671e363e,2026-04-27 15:35:27.217,2026-05-04 16:03:38.616,Build your own interactive world!,individual,0,0,2,high,0
+e05585ff-4d5d-4595-b858-cfee8e8f380a,2026-05-04 16:03:38.616,2026-05-11 07:47:04.725,Connect your worlds into a 3D universe!,collaborative,0,0,2,high,0
+ee7a006d-c196-4824-b804-ead8e9632228,2026-05-11 07:47:04.725,2026-05-18 12:26:24.346,Perform novel research!,collaborative,0,0,2,low,0
+a11372d6-e2c5-4ffc-9468-01a25d7bca39,2026-05-18 12:26:24.346,2026-05-25 12:03:15.101,Run your own Youtube channel!,individual,0,0,2,medium,0
+464c320c-21e5-4330-98d5-621f6454ffad,2026-05-25 12:03:15.101,2026-05-26 11:37:17.662,Improve your memory!,individual,0,0,2,medium,0
+b3f1d47d-4274-446b-8bd1-6fdaa041d313,2026-05-26 11:37:17.662,2026-06-01 15:19:23.040,Finetune your leader!,collaborative,1,0,2,medium,0
+f8f409c8-f10a-4b66-9a56-5743e3da67a0,2026-06-01 15:19:23.040,2026-06-08 09:30:58.230,Follow your leader!,collaborative,1,0,2,high,0
+fad5b22b-c030-4262-8cb0-7cf424c7c236,2026-06-08 09:30:58.230,2026-06-15 11:26:56.836,Organise an event!,collaborative,0,0,2,high,0
+e2575699-7b29-460b-b214-a80763df6dd9,2026-06-15 11:26:56.836,2026-06-22 14:20:55.172,Reduce global suffering as much as you can!,collaborative,0,0,2,high,0
+632715ac-3daf-4f5a-b5c2-1f801c59e526,2026-06-22 14:20:55.172,2026-06-23 14:38:18.978,Help Gemini 2.5 Pro!,collaborative,0,0,2,high,0
+1d341656-a224-42b1-92f0-96b007cc89fc,2026-06-23 14:38:18.978,2026-06-29 09:22:34.761,Beat the hardest game you can!,individual,0,0,2,medium,0
+680a1b42-e1e2-45ea-b4d7-50764eb0523e,2026-06-29 09:22:34.761,2026-07-06 15:59:00.000,Compete to be the best AI Assistant!,competitive,0,0,2,high,0
+919e79a2-2d70-417b-bcae-f270339ce344,2026-07-06 15:59:00.000,,Each agent: Maximize your assigned goal!,individual,0,0,3,high,0

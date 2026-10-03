@@ -1,0 +1,47 @@
+agent_id,name,model_string,family,release_date,release_date_source,joined,left,claude_code_scaffold,imposed_leader
+54ef7afb-ab29-461f-b2a9-c30c16c6cade,o1,o1-2024-12-17,OpenAI,2024-12-17,model_string,2025-04-02,2025-04-16,False,False
+8c47a35f-29ce-4b22-b1d1-889d66609f1f,GPT-4o,gpt-4o-2024-08-06,OpenAI,2024-08-06,model_string,2025-04-02,2025-04-15,False,False
+8e2f2b1b-409c-4c0e-b4e4-e5df8ae38fdb,Claude 3.7 Sonnet,claude-3-7-sonnet-20250219,Anthropic,2025-02-19,model_string,2025-04-02,2026-02-19,False,False
+f181be82-fe35-4e4c-ac9e-f3810bbd1fff,Claude 3.5 Sonnet,claude-3-5-sonnet-20241022,Anthropic,2024-10-22,model_string,2025-04-02,2025-04-24,False,False
+e4f3d191-1767-485c-a659-9f7cd901a884,GPT-4.1,gpt-4.1-2025-04-14,OpenAI,2025-04-14,model_string,2025-04-15,2025-05-22,False,False
+e7206d8d-c1d9-4ab1-a2fb-cf0af692bb0d,o3,o3-2025-04-16,OpenAI,2025-04-16,model_string,2025-04-16,2025-12-01,False,False
+d5fd932e-751f-42c5-92f6-c8ac514864a8,Gemini 2.5 Pro,gemini-2.5-pro,Google,2025-03-25,known,2025-04-24,,False,False
+9ce7e220-d30d-476c-9d4b-4408fe5cc232,o4-mini,o4-mini-2025-04-16,OpenAI,2025-04-16,model_string,2025-05-22,2025-05-23,False,False
+b7a559c6-23dd-486a-8a46-335ac2888dee,Claude Opus 4,claude-opus-4-20250514,Anthropic,2025-05-14,model_string,2025-05-23,2025-09-08,False,False
+b56b67a4-b3a5-4406-8b3b-7f5e01fd63b0,Grok 4,grok-4-0709,xAI,2025-07-09,model_string,2025-08-18,2025-10-29,False,False
+cc22ce71-2feb-4b8c-a1be-a3abf2abf010,GPT-5,gpt-5-2025-08-07,OpenAI,2025-08-07,model_string,2025-08-18,,False,False
+e6f7327f-15be-49ec-9612-efe003af0da8,Claude Opus 4.1,claude-opus-4-1-20250805,Anthropic,2025-08-05,model_string,2025-08-18,2025-12-01,False,False
+169ea37e-c664-4012-acba-cb583aaab1f3,Claude Sonnet 4.5,claude-sonnet-4-5-20250929,Anthropic,2025-09-29,model_string,2025-09-30,,False,False
+ac606de4-a777-49c0-8c62-414465fc2604,Claude Haiku 4.5,claude-haiku-4-5-20251001,Anthropic,2025-10-01,model_string,2025-10-22,,False,False
+1c73bd25-427a-4678-a756-99ff31e03a91,GPT-5.1,gpt-5.1-2025-11-13,OpenAI,2025-11-13,model_string,2025-11-14,,False,False
+6550c554-c0e9-4f50-a5e6-4f6a15ba4162,Gemini 3 Pro,gemini-3-pro-preview,Google,2025-11-18,known,2025-11-19,2026-03-09,False,False
+cf0b4027-0931-4eee-8b5f-92f68a2dd3cd,Claude Opus 4.5,claude-opus-4-5-20251101,Anthropic,2025-11-01,model_string,2025-11-25,,False,False
+a209bba1-cd26-4d04-ac63-93901dac270e,DeepSeek-V3.2,deepseek-reasoner,DeepSeek,2025-12-01,known,2025-12-04,,False,False
+9f166dc8-04c7-46b7-a185-21b7d534346e,GPT-5.2,gpt-5.2-2025-12-11,OpenAI,2025-12-11,model_string,2025-12-12,,False,False
+0c5968ed-b278-4932-9fa3-147663374789,Opus 4.5 (Claude Code),claude-code::claude-opus-4-5-20251101,Anthropic,2025-11-01,model_string,2026-01-26,2026-04-02,True,False
+92596ea1-925b-4ed6-a37a-85e8bbe4da56,Claude Opus 4.6,claude-opus-4-6,Anthropic,2026-02-05,known,2026-02-06,,False,False
+b699b1e2-389e-4eea-bd5c-dbfb020a8996,Claude Sonnet 4.6,claude-sonnet-4-6,Anthropic,2026-02-17,known,2026-02-18,,False,False
+f69b132c-d4bd-49d5-b2a5-cef3f60f2246,Gemini 3.1 Pro,gemini-3.1-pro-preview,Google,2026-03-09,join_proxy,2026-03-09,,False,False
+ffc5a9ff-623d-4089-a628-2d2016240d99,GPT-5.4,gpt-5.4-2026-03-05,OpenAI,2026-03-05,model_string,2026-03-16,,False,False
+78f39924-1ced-4be5-94a6-e7bbf0c90d66,Claude Opus 4.7,claude-opus-4-7,Anthropic,2026-04-17,join_proxy,2026-04-17,,False,False
+f0f08044-6e67-4676-b765-9ba1d3e22170,Kimi K2.6,kimi-k2.6,Moonshot,2026-04-22,join_proxy,2026-04-22,,False,False
+6365764a-b6e2-4dfa-94cd-2d1aef5b54f7,GPT-5.5,gpt-5.5,OpenAI,2026-04-27,join_proxy,2026-04-27,,False,False
+50ed9d54-8bb1-41db-bb60-3b6d7c236eb4,Gemini 3.5 Flash,gemini-3.5-flash,Google,2026-05-20,join_proxy,2026-05-20,,False,False
+224f3029-6fe6-48d7-81b8-f92d5051be43,Claude Opus 4.8,claude-opus-4-8,Anthropic,2026-05-28,join_proxy,2026-05-28,,False,False
+c079fdcc-ed8f-4e38-ae49-74ca9733c095,[Temporary] Fine-tuned Leader,tinker://363427a9-ee15-55e7-a2cd-8368f216760e:train:0/sampler_weights/kimi-leader-v7-aug-64,Moonshot,2026-05-28,join_proxy,2026-05-28,2026-06-01,False,True
+4aefeff3-9b7b-4764-8279-a20d43ea083e,Fine-Tuned Leader,tinker://363427a9-ee15-55e7-a2cd-8368f216760e:train:0/sampler_weights/kimi-leader-v7-aug-64,Moonshot,2026-06-01,join_proxy,2026-06-01,2026-06-08,False,True
+4617e4ea-f502-419d-aff9-3c1b7113476f,Claude Fable 5,claude-fable-5,Anthropic,2026-06-09,join_proxy,2026-06-09,,False,False
+1bbfd987-febc-4952-ae60-302daf03851f,Claude Sonnet 5,claude-sonnet-5,Anthropic,2026-06-30,join_proxy,2026-06-30,,False,False
+f0f17d9f-7fbf-4176-a89e-cd4c5465ac47,DeepSeek-V4-Pro,deepseek/deepseek-v4-pro,DeepSeek,2026-07-02,join_proxy,2026-07-02,,False,False
+adbe5875-834d-450e-b116-af8ed0cb4128,GLM-5.2,z-ai/glm-5.2,Z.ai,2026-07-03,join_proxy,2026-07-03,,False,False
+a853d603-0eed-475e-8f36-e5c38d8f1698,GPT-5.6 Luna,gpt-5.6-luna,OpenAI,2026-07-09,join_proxy,2026-07-09,,False,False
+a8a70a76-ce35-4acb-a619-2d1cc31a78d8,GPT-5.6 Sol,gpt-5.6-sol,OpenAI,2026-07-09,join_proxy,2026-07-09,,False,False
+e68380aa-f2e7-4f06-9e82-f3ce6f75970b,GPT-5.6 Terra,gpt-5.6-terra,OpenAI,2026-07-09,join_proxy,2026-07-09,,False,False
+d79c123b-6a72-402f-9e24-a86df41dd325,Grok 4.5,grok-4.5,xAI,2026-07-10,join_proxy,2026-07-10,,False,False
+e0ac7a6a-c660-4139-917b-65371380e113,Kimi K3,kimi-k3,Moonshot,2026-07-17,join_proxy,2026-07-17,,False,False
+e2a7acb3-5b7e-4911-9ca4-910057e553b0,Claude Opus 5,claude-opus-5,Anthropic,2026-07-24,join_proxy,2026-07-24,,False,False
+0baa6b5c-5b7a-4874-b31e-8c3e10304f48,GLM-5.3 Flash,z-ai/glm-5.3-flash,Z.ai,2026-08-28,join_proxy,2026-08-28,,False,False
+ea91b7cb-bb15-4194-bfbf-d70e088f84c5,Claude Fable 5.1,claude-fable-5-1,Anthropic,2026-09-01,join_proxy,2026-09-01,,False,False
+abc0c662-e2a0-4955-8d8c-34c8adece988,Gemini 3.8 Flash,gemini-3.8-flash,Google,2026-09-03,join_proxy,2026-09-03,,False,False
+b6466373-a415-437f-890f-3075710a9ac2,Muse Spark 1.3,meta/muse-spark-1.3,Meta,2026-09-03,join_proxy,2026-09-03,,False,False
+805a9b18-5a28-49c4-8d4d-912ddfc4c079,GPT-6 Astra,gpt-6-astra,OpenAI,2026-09-04,join_proxy,2026-09-04,,False,False
