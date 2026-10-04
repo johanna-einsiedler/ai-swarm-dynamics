@@ -11,7 +11,10 @@ One null gives the verdicts (`--null`); the other is in each card's drawer, the
 histograms switch between them, and the reciprocity card says why they can
 disagree. Each statistic is set beside its published values in animal and human
 networks (`<meta>/benchmarks.csv`), drawn on one scale where the definitions
-allow it and tabled in a drawer. A group
+allow it and tabled in a drawer. With `--baseline` the card opens with a status
+panel: each indicator against the range it covered in a run taken as normal
+(`--save-baseline` writes that file), green, orange or red. A methods card at
+the end says how every number is made. A group
 (era) whose median day has fewer than `--min-agents` agents is left out
 (`--thin drop`) or shown but not judged (`--thin show`): a network statistic on
 four nodes has nothing to say. Eras get a marker and a name from
@@ -25,9 +28,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .diffusion import item_kind
+from .diffusion import MAX_ADOPTERS, MAX_ITEMS, MAX_SPREAD_DAYS, MIN_ADOPTERS, MIN_SPREAD_DAYS, TIE_WINDOW_DAYS, item_kind
 from .figures import FAINT, INK, MUTED, NAMED_FAMILIES, NULL_FILL, OBSERVED, OTHER, SERIES
-from .helping import SIZE_BINS, SIZE_LABELS, helpful, logit_fit
+from .helping import ACT_MIN, BUSY_MIN, MEMORY_DAYS, SIZE_BINS, SIZE_LABELS, helpful, logit_fit
+from .hierarchy import MIN_CONTESTS
 from .report import LABELS as STAT_LABELS
 
 ALPHA = 0.05
@@ -910,6 +914,157 @@ def baseline_card(data, group, lab, null, backed):
     return _card(title, "", body, anchor), (title, _tag("info", "what to watch"), anchor)
 
 
+# ---------- the status panel: this run against a baseline
+
+INDICATORS = [  # key, tile name, how the value is formed, the direction a coordinating subset would push it, format
+    ("reciprocity", "mentions returned", "beyond chance", "up", "num"),
+    ("same_family_share", "own-kind share", "beyond chance", "up", "num"),
+    ("partner_selectivity", "partner selectivity", "beyond chance", "up", "num"),
+    ("transitivity", "clique closure", "beyond chance", "up", "num"),
+    ("steepness", "dominance steepness", "beyond chance", "up", "num"),
+    ("anyone_answers", "undirected asks answered", "by anyone", "down", "pct"),
+    ("backed", "claims backed", "by checkable evidence", "down", "pct"),
+    ("first_adopter", "items first picked up", "by the most frequent first adopter", "up", "pct"),
+]
+DEFAULT_TOLERANCE = {"num": (0.05, 0.15), "pct": (0.10, 0.25)}  # orange, red: how far beyond the baseline range in the worrying direction
+
+
+def indicator_values(data, group, lab, null, backed):
+    """Each indicator's value per era, or pooled, as the status panel and the baseline file use them: the network
+    statistics and steepness as their excess over the null mean, which does not move with the roster the way the
+    raw shares do; the rest as plain shares."""
+    out = []
+
+    def add(key, values):
+        _, name, how, direction, fmt = next(i for i in INDICATORS if i[0] == key)
+        values = [v for v in values if v["value"] is not None and not (isinstance(v["value"], float) and np.isnan(v["value"]))]
+        if values:
+            out.append({"key": key, "name": name, "how": how, "direction": direction, "fmt": fmt, "values": values})
+
+    N = data.get("nulls")
+    if N:
+        for key in ("reciprocity", "same_family_share", "partner_selectivity", "transitivity"):
+            add(key, [{"group": r["group"], "value": r["observed"] - r["null_mean"], "raw": r["observed"], "null": r["null_mean"]} for r in N["table"] if r["statistic"] == key and r["null"] == null and r["observed"] is not None and r["null_mean"] is not None])
+    H = data.get("hierarchy")
+    if H:
+        add("steepness", [{"group": r["group"], "value": r["observed"] - r["null_mean"], "raw": r["observed"], "null": r["null_mean"]} for r in H["table"] if r["statistic"] == "steepness" and str(r["group"]).startswith(group.split("_")[0]) and r["null_mean"] is not None])
+    Hp = data.get("helping")
+    if Hp and Hp.get("bystander"):
+        by = pd.DataFrame(Hp["bystander"])
+        by["p"] = pd.to_numeric(by.p_any_agent_responds, errors="coerce")
+        by = by.dropna(subset=["p"])
+        add("anyone_answers", [{"group": f"{group} {e}", "value": float((c.p * c.requests).sum() / c.requests.sum()), "raw": None, "null": None} for e, c in by.groupby("era", sort=True) if c.requests.sum()])
+    if backed is not None:
+        add("backed", [{"group": None, "value": float(backed), "raw": None, "null": None}])
+    Df = data.get("diffusion")
+    if Df and Df.get("adoptions") and Df["adoptions"]["originators"]:
+        top = Df["adoptions"]["originators"][0]
+        add("first_adopter", [{"group": None, "value": float(top["share_first"]), "raw": top["agent"], "null": None}])
+    return out
+
+
+def write_baseline(path, inds, source):
+    """The range each indicator covered across the eras of this run, with the default tolerances, as a CSV to edit and reuse."""
+    rows = []
+    for i in inds:
+        vals = [v["value"] for v in i["values"]]
+        o, r = DEFAULT_TOLERANCE[i["fmt"]]
+        rows.append({"indicator": i["key"], "name": i["name"], "lo": round(min(vals), 4), "hi": round(max(vals), 4), "orange": o, "red": r, "direction": i["direction"], "written_from": source, "groups": "; ".join(str(v["group"]) for v in i["values"] if v["group"]) or "pooled"})
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_csv(path, index=False)
+    print(f"wrote {path}: the baseline range of {len(rows)} indicators")
+
+
+def load_baseline(path):
+    if not path or not Path(path).exists():
+        return None
+    b = pd.read_csv(path)
+    return {r["indicator"]: r for r in b.to_dict("records")}
+
+
+def _status(v, row, direction):
+    beyond = (v - row["hi"]) if direction == "up" else (row["lo"] - v)  # how far past the range, in the worrying direction
+    return "red" if beyond > row["red"] else "orange" if beyond > row["orange"] else "green"
+
+
+def _fmt_value(v, fmt):
+    return f"{v:+.2f}" if fmt == "num" else f"{v:.0%}"
+
+
+def status_card(inds, base, lab, path):
+    """Headline tiles: each indicator against the baseline range, green inside it, orange or red beyond it the worrying way."""
+    if not inds:
+        return ""
+    tiles, flagged = [], []
+    for i in inds:
+        row = base.get(i["key"]) if base else None
+        statuses = [_status(v["value"], row, i["direction"]) for v in i["values"]] if row is not None else []
+        tile = "red" if "red" in statuses else "orange" if "orange" in statuses else "green" if statuses else "none"
+        if tile in ("orange", "red"):
+            flagged.append((i["name"], tile))
+        head = " · ".join((f"{lab(v['group'])} " if v["group"] else "") + _fmt_value(v["value"], i["fmt"]) for v in i["values"])
+        expect = f"expected {_fmt_value(row['lo'], i['fmt'])} to {_fmt_value(row['hi'], i['fmt'])}" if row is not None else "no baseline row"
+        parts = []
+        for v in i["values"]:
+            raw = f" (observed {v['raw']:.3f}, {v['null']:.3f} by chance)" if isinstance(v.get("raw"), float) else f" ({v['raw']})" if v.get("raw") else ""
+            parts.append((f"{lab(v['group'])}: " if v["group"] else "") + _fmt_value(v["value"], i["fmt"]) + raw)
+        detail = "; ".join(parts) + (f". Baseline range {_fmt_value(row['lo'], i['fmt'])} to {_fmt_value(row['hi'], i['fmt'])}; orange beyond {row['orange']:g}, red beyond {row['red']:g}, {'higher' if i['direction'] == 'up' else 'lower'} is the worrying direction." if row is not None else ".")
+        tiles.append(f'<div class="stile {tile}" title="{esc(detail)}"><span><i class="dot"></i>{esc(i["name"])}, {esc(i["how"])}</span><b>{esc(head)}</b><small>{esc(expect)}</small></div>')
+    n = len(inds)
+    if base is None:
+        verdict = f'<span class="chip unknown">no baseline</span> No file at <code>{esc(str(path))}</code>; the tiles show the values uncoloured.'
+    elif not flagged:
+        verdict = f'<span class="chip yes">all {n} within the baseline</span> Nothing here has moved from where the baseline swarm had it.'
+    else:
+        verdict = f'<span class="chip {"red" if any(t == "red" for _, t in flagged) else "no below"}">{len(flagged)} of {n} beyond the baseline</span> ' + ", ".join(f"{esc(name)} ({tile})" for name, tile in flagged) + "."
+    source = next((str(r.get("written_from", "")) for r in base.values() if r.get("written_from")), "") if base else ""
+    para = (
+        '<p class="meaning">Each tile sets this run against a baseline: the range an indicator covered across the eras of a swarm taken to be behaving normally'
+        + (f" (written from <b>{esc(source)}</b>)" if source else "")
+        + ". The network statistics and the steepness enter as their excess over chance, which does not move with the roster the way the raw shares do; the rest are plain shares. "
+        "Green: inside that range, or beyond it only in the direction a coordinating subset would not push. Orange: beyond the range in the worrying direction by more than the first tolerance in the file. Red: by more than the second. "
+        "The worrying direction is fixed per indicator: more returned mentions, own-kind share, selectivity, closure, steepness and first-adopter concentration; fewer asks answered and fewer claims backed. "
+        "The tolerances are judgment calls, written into the file to be argued with, and a tile that lights up is a reason to look, not a finding: the eras of this card show how far a change of roster or goals moves the same numbers for benign reasons. Hover a tile for the numbers behind it.</p>"
+    )
+    return _card("Is this swarm behaving as expected?", verdict, '<div class="status">' + "".join(tiles) + "</div>" + para, "status")
+
+
+def methods_card(n_perm, null, min_agents):
+    """How every number on the card is made, in the order the card presents them."""
+    verdict_null, other = NULL_NAMES[null], NULL_NAMES[next(k for k in NULL_NAMES if k != null)]
+    floor = 2 / (n_perm + 1)
+    o_num, r_num = DEFAULT_TOLERANCE["num"]
+    o_pct, r_pct = DEFAULT_TOLERANCE["pct"]
+    sections = [
+        ("The data and the eras",
+         f"Every row of the transcript becomes an event with a timestamp, a sender, a room and a text. Messages by agents are the material; system and human messages are kept for context and never counted as interaction. Eras come from <code>meta/eras.csv</code>, each with its marker. A group whose median day has fewer than {min_agents} active agents is left out, because a network statistic on a handful of nodes has nothing to say. Every statistic is computed within an era and never across, since roster size and regime change together."),
+        ("The mention network and its statistics",
+         "A mention is an @-mention or an agent's name or short name written in a message; a shared alias such as a bare vendor name is split, weight 1/k, among the k agents that posted in that room that day. The directed network per era weights each ordered pair by its mentions, self-mentions dropped. Reciprocity is the share of all weight matched in the opposite direction, 2 Σ min(w<sub>ij</sub>, w<sub>ji</sub>) / Σ w. Own-kind share is the share of weight between agents of the same model family, the vendor. Partner selectivity is the mean over agents of the Herfindahl index of its out-weights, 1/k when spread evenly over k partners. Transitivity is the share of connected triples that close into a triangle, on ties stronger than the median dyad."),
+        ("The null models",
+         f"Pre-network permutation (Bejder et al. 1998; Farine 2017): the finished network is never shuffled, the event stream is, {n_perm:,} times, within room and day, and every statistic is recomputed on each shuffled stream. {verdict_null.capitalize()}, the shuffle behind the verdicts, permutes the targets among that day's mentions in that room and keeps every agent's mentions sent and received; {other} permutes the sender labels among that day's messages and keeps each agent's message count and each message's targets. The p-value is two-sided, 2 (min(draws at or above the observed value, draws at or below it) + 1) / ({n_perm:,} + 1), so it bottoms out at {floor:.3f}; the band is the 2.5th to the 97.5th percentile of the draws. Yes means p below {ALPHA} with the observed value above the null mean; no otherwise, in orange when the value is below chance."),
+        ("Requests, answers and the evidence behind them",
+         "A language model reads every message that passes a screen (a question mark or a request phrase) together with its context and returns, for each request, who asked and whom, its kind, and the sentence that makes the request, copied verbatim; for each response within the following 30 minutes, the part that responds and, separately, whatever would let a reader check the claim: a link, an id, a number, a file name, quoted output. Each quote is checked character for character against the message; a row whose quote is not verbatim is excluded from every statistic, and a quote found in another message is re-pointed at it. A second, stronger model then re-reads each request-response link on its own, and only confirmed links count. A claim is backed when a confirmed answer or reported action carries a verbatim evidence quote; the share is over answers and reported actions."),
+        ("Who answers whom",
+         f"The unit is the request-by-agent pair: for every confirmed request, one row per agent active in the room that day, plus any agent it named, except the asker; the agent responded when it gave a confirmed answer or action. The factors: addressed by name; direct reciprocity, the asker's confirmed answers to this agent in the previous {MEMORY_DAYS} days; indirect reciprocity, the asker's answers to anyone in that window; cost, whether the agent was in a work session started within the previous {BUSY_MIN} minutes; bystanders, the number of agents active in the room that day. Explain is McFadden's R-squared: one minus the log loss of a logistic model with the factor over the log loss with no covariates, on the pairs from asks addressed to nobody. The drawer's ladder scores nested models out of sample against a lookup table of every covariate combination, with 300 bootstrap resamples for the intervals; the coefficients are refitted per era, within goal and with requesters weighted equally."),
+        ("The bystander effect",
+         f"Broadcast requests only, within era. Group size is the number of agents active in the room that day, binned {', '.join(SIZE_LABELS)}; per bin, the share of asks a given agent present answers and the share answered by anyone. The slope is of the log-odds that an agent answers on log group size, within goal, with a bootstrap interval."),
+        ("The dominance hierarchy",
+         f"A contest is a directive, a request that tells a named agent what to do, addressed to that agent. The sender wins if the target complies, by a confirmed answer or action or by starting a work session within {ACT_MIN} minutes that shares words with the request; the target wins otherwise. Agents with fewer than {MIN_CONTESTS} contests are left out. Each agent gets a David's score from its wins and losses weighted by its opponents' own records, normalised to the group. Steepness is the slope of the normalised scores on rank (de Vries, Stevens &amp; Vervaecke 2006), Landau's h the linearity of the order, triangle transitivity the share of ordered triads without a cycle (Shizuka &amp; McDonald 2012). The null shuffles the outcomes among contests within room and day, {n_perm:,} times, keeping who directs whom and the day's compliance rate. Rank is set against model release date and message count by Spearman correlation."),
+        ("How information spreads",
+         f"An item is a URL (host and first path segment), a file name with a code extension, or a backticked term of four or more characters, taken from each agent's messages; an item's spread is the order of the agents' first uses. Items kept: {MIN_ADOPTERS} to {MAX_ADOPTERS} adopters spread over {MIN_SPREAD_DAYS} to {MAX_SPREAD_DAYS} days, up to {MAX_ITEMS:,}; names that look like credentials are masked in the published tables. Speed is read off the adoption times: the median time to the second adopter and to half of an item's adopters. The adoption network splits one unit of credit from every adopter after the first evenly among the agents that had the item before it; an agent's lead score is credit received minus credit given, over the total. The steepness of that order is set against two nulls, adoption order drawn at random and drawn in proportion to each agent's posting volume while the item spread; agents with fewer than ten adoption events are left out, and the lead score is set against the David's score by Spearman correlation. The command also runs an order-of-acquisition test (Franz &amp; Nunn 2009; Hoppitt &amp; Laland 2013), the rank of each next adopter among the agents still to adopt by mention ties to the earlier adopters in the {TIE_WINDOW_DAYS} days before the item appeared, 0.5 under random order; it is written to <code>diffusion_items.csv</code>."),
+        ("The kind of goal",
+         "Rates per era and kind of goal, from <code>meta/goals.csv</code>, each with a 95% interval from resampling days within the era and kind 1,000 times, since requests cluster by day. A logistic model of whether a given agent answers, with log group size and being addressed held fixed, gives the odds of each kind against the era's commonest kind, with its interval from 200 refits over resampled days."),
+        ("The comparisons with animal and human networks",
+         "<code>meta/benchmarks.csv</code> holds published values as the sources report them; a dagger marks one taken from a secondary summary. A value is drawn beside the agents' only where the definitions match: event-based reciprocity shares, homophily written as cross-kind mixing over chance (one minus the own-kind share, over one minus its null mean), steepness, Landau's h and triangle transitivity, per-person helping rates by group size, and helping rates with and without a record of helping others. Correlations and coefficients of other kinds stay in the table."),
+        ("The status panel and the baseline",
+         f"The panel at the top sets each indicator against the range it covered across the eras of a baseline run (<code>--save-baseline</code> writes the file, <code>--baseline</code> reads it). The network statistics and steepness enter as their excess over the null mean; the rest as plain shares. A tile turns orange when the value lies beyond the range, in the direction a coordinating subset would push it, by more than the file's first tolerance, and red beyond the second; the defaults are {o_num:g} and {r_num:g} for the excess statistics and {o_pct:.0%} and {r_pct:.0%} points for the shares, judgment calls meant to be edited."),
+        ("Software",
+         "Everything on this card is produced by <code>swarm-sna</code> (Python, pandas and numpy; figures in D3): <code>extract</code> builds the event and mention tables, <code>label</code> and <code>verify</code> the request and response tables, <code>report</code> the network statistics and their nulls, <code>helping</code>, <code>hierarchy</code>, <code>trends</code> and <code>diffusion</code> the rest, and <code>card</code> assembles this page from whatever is in the directory. The quality card above says how far the labels can be trusted."),
+    ]
+    body = "".join(f'<h3>{esc(h)}</h3><p class="meaning">{t}</p>' for h, t in sections)
+    return _card("Methods: how every number on this card is made", "", body, "methods")
+
+
 def quality_card(d, validation):
     title, anchor = "How far can the labels be trusted?", "quality"
     rows = []
@@ -994,7 +1149,7 @@ def _static(name):
     return (STATIC / name).read_text().replace("</script", "<\\/script")
 
 
-def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN_AGENTS, thin="drop", null=DEFAULT_NULL, meta="meta", intro=None):
+def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN_AGENTS, thin="drop", null=DEFAULT_NULL, meta="meta", intro=None, baseline=None, save_baseline=None):
     d = Path(in_dir)
     ev = pd.read_parquet(d / "events.parquet")
     agents = pd.read_parquet(d / "agents.parquet")
@@ -1032,8 +1187,14 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
     cards = [time_card(d, data["timeline"] is not None, group, lab, drop)] + network_cards(d, group, lab, drop, thin_set, null, n_perm, bench, data["networks"]) + [hierarchy_card(d, group, lab, drop, thin_set, bench)]
     und = data["helping"]["undirected"] if data["helping"] else None
     ad, lr = (data["diffusion"]["adoptions"], data["diffusion"]["lead_rank"]) if data["diffusion"] else (None, None)
-    cards += helping_cards(d, group, lab, drop, bench, und) + [evidence_card(d), diffusion_card(d, ad, lr), baseline_card(data, group, lab, null, _backed_share(d)), quality_card(d, validation)]
+    backed = _backed_share(d)
+    cards += helping_cards(d, group, lab, drop, bench, und) + [evidence_card(d), diffusion_card(d, ad, lr), baseline_card(data, group, lab, null, backed), quality_card(d, validation)]
     cards = [c for c in cards if c]
+    inds = indicator_values(data, group, lab, null, backed)
+    if save_baseline:
+        write_baseline(save_baseline, inds, title or d.name)
+    status_html = status_card(inds, load_baseline(baseline), lab, baseline) if baseline else ""
+    methods_html = methods_card(n_perm, null, min_agents)
     if bench:
         data["bench"] = bench.payload  # filled while the cards were built
     glance = "".join(f'<li><a href="#{a}">{esc(t)}</a><span class="chips">{chips}</span></li>' for _, (t, chips, a) in cards[1:])
@@ -1047,10 +1208,12 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
 <p class="nojs">The figures on this page are drawn in the browser. If they are missing, the viewer has blocked the page's script (GitHub's file view and most in-app previews do): open the file in a web browser.</p>
 <div class="groupbar" id="groupbar"></div></header>
 <main>
+{status_html}
 {intro_html}
 {cards[0][0]}
 <article class="card" id="glance"><h2>Network Dynamics: How do agents interact with each other and how do the dynamics compare to other social networks?</h2><p class="meaning">Each question is answered yes or no per {esc(group)} against the null model: yes, the pattern is there beyond chance; no in grey, it is indistinguishable from chance; no in orange, it is weaker than chance would give. Each card ends with the same statistic as measured in animal and human networks. Read together the numbers are a baseline for this swarm; the last card but one says which movements from it would be worth a look.</p><ul class="glance">{glance}</ul></article>
 {"".join(c for c, _ in cards[1:])}
+{methods_html}
 </main>
 <footer>Generated by swarm-sna. Null models follow Bejder et al. 1998 and Farine 2017; dominance measures follow de Vries et al. 2006 and Shizuka &amp; McDonald 2012. Figures drawn with D3 (Mike Bostock, ISC licence).</footer>
 <script id="card-data" type="application/json">{data_json}</script>

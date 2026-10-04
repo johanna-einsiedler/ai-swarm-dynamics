@@ -93,7 +93,7 @@ def cmd_trends(args):
 def cmd_card(args):
     from . import card
 
-    card.run(args.dir, title=args.title, group=args.by, validation=args.validation, min_agents=args.min_agents, thin=args.thin, null=args.null, meta=args.meta, intro=args.intro)
+    card.run(args.dir, title=args.title, group=args.by, validation=args.validation, min_agents=args.min_agents, thin=args.thin, null=args.null, meta=args.meta, intro=args.intro, baseline=args.baseline, save_baseline=args.save_baseline)
 
 
 def cmd_run(args):
@@ -110,7 +110,7 @@ def cmd_run(args):
         cmd_helping(argparse.Namespace(dir=args.out, bootstraps=300, seed=args.seed))
         cmd_hierarchy(argparse.Namespace(dir=args.out, by="era", meta=args.meta, permutations=args.permutations, seed=args.seed))
         cmd_trends(argparse.Namespace(dir=args.out, meta=args.meta))
-    cmd_card(argparse.Namespace(dir=args.out, title=args.title, by="era", validation="validation", min_agents=args.min_agents, thin="drop", null="target", meta=args.meta, intro=args.intro))
+    cmd_card(argparse.Namespace(dir=args.out, title=args.title, by="era", validation="validation", min_agents=args.min_agents, thin="drop", null="target", meta=args.meta, intro=args.intro, baseline=args.baseline, save_baseline=None))
 
 
 def cmd_diffusion(args):
@@ -191,7 +191,9 @@ def main():
     c.add_argument("--thin", default="drop", choices=["drop", "show"], help="leave a thin group out of the card, or show it unjudged")
     c.add_argument("--null", default="target", choices=["target", "speaker"], help="the default null: shuffle whom each mention was addressed to, or who spoke; the other sits in each card's drawer")
     c.add_argument("--meta", default="meta", help="directory with eras.csv (marker, name, description per era), if any")
-    c.add_argument("--intro", default=None, help="a text file (paragraphs) or .html snippet introducing the data, shown at the top of the card")
+    c.add_argument("--intro", default=None, help="a text file (paragraphs, '## ' headings) or .html snippet introducing the data, shown at the top of the card")
+    c.add_argument("--baseline", default=None, help="a baseline file: the card opens with each indicator against the range it covered in a run taken as normal, green, orange or red")
+    c.add_argument("--save-baseline", default=None, help="write that file from this run (the range of each indicator across its eras, with default tolerances)")
     c.set_defaults(func=cmd_card)
 
     a = sub.add_parser("run", help="everything in one go: extract, (label), report, analyses, report card")
@@ -205,6 +207,7 @@ def main():
     a.add_argument("--title", default=None)
     a.add_argument("--min-agents", type=int, default=6, help="a group whose median day has fewer agents than this is left out of the card")
     a.add_argument("--intro", default=None, help="a text file introducing the data, shown at the top of the card")
+    a.add_argument("--baseline", default=None, help="a baseline file written by `card --save-baseline` from a run taken as normal; the card then opens with the status panel")
     a.add_argument("--seed", type=int, default=0)
     a.set_defaults(func=cmd_run)
 

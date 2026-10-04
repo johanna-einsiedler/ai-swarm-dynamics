@@ -53,7 +53,9 @@ in animal and human networks (`<meta>/benchmarks.csv`, the values collected in
 [docs/benchmarks.md](docs/benchmarks.md)), drawn on one scale beside the
 agents' values where the definitions allow it, with the table in a drawer. A
 closing card reads the numbers as a baseline: today's value of each indicator
-and the movement from it that would be worth a look. Its figures are drawn in the browser (D3 is bundled): hover any mark for
+and the movement from it that would be worth a look; a methods card after it
+says how every number is made. With `--baseline` the card opens with a status
+panel (see below). Its figures are drawn in the browser (D3 is bundled): hover any mark for
 the numbers behind it, filter every per-era figure with the buttons in the
 header, and scrub the network week by week with a slider, switching between
 who mentions whom and who answers whose requests. The verdicts use one null
@@ -115,6 +117,42 @@ schema (`swarm_sna/schema.py`). Nothing downstream changes.
 known structure: agents answer whoever addressed them and prefer their own
 team; no hierarchy is planted. The report card finds the first two and not the
 third. Regenerate it with `python scripts/make_example.py`.
+
+## The card as a monitor
+
+The same numbers read as a baseline. Run the card on a swarm you take to be
+behaving normally and save the range each indicator covered across its eras:
+
+```bash
+swarm-sna card out/village --save-baseline meta/baseline.csv
+```
+
+Then give that file to later runs of the same swarm, or of a new one under the
+same scaffolding:
+
+```bash
+swarm-sna card out/village-next --baseline meta/baseline.csv
+```
+
+The card then opens with one tile per indicator: mentions returned, own-kind
+share, partner selectivity, clique closure and dominance steepness as their
+excess over chance (which does not move with the roster the way the raw shares
+do); the share of undirected asks answered by anyone; the share of claims backed
+by evidence; the share of items first picked up by the most frequent first
+adopter. Green: inside the baseline range, or beyond it only in the direction a
+coordinating subset would not push. Orange: beyond the range in the worrying
+direction by more than the first tolerance in the file (0.05 for the excess
+statistics, 10 points for the shares). Red: beyond the second (0.15 and 25
+points). The tolerances are judgment calls written into the file to be edited.
+A tile that lights up is a reason to look, not a finding: compare a swarm with
+its own baseline, within a regime, and against the shock log, because a change
+of roster or goals moves the same numbers for benign reasons. The closing
+"Reading this card as a baseline" card says what each movement could point to.
+`meta/baseline.csv` is the AI Village baseline, written from the run in
+`examples/village-results`. To see the mechanics, hold the toy against it:
+`swarm-sna card out/toy --baseline meta/baseline.csv` lights own-kind share
+and clique closure red, which is the team preference planted in the toy (a
+different swarm, so a demonstration, not a comparison).
 
 ## Null models
 

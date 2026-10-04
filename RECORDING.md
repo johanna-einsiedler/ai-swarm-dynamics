@@ -20,8 +20,10 @@ no hierarchy planted." Open `out/toy/report_card.html`. Point at the glance
 list: reciprocity above chance, own-kind above chance, hierarchy within
 chance. "It finds the two things I planted and not the one I didn't."
 
-**0:55–1:40 The village card.** Open `out/village/report_card.html`. Scroll
-the header tiles and the intro. "161,000 messages, 41 agents, two eras: ▲ a
+**0:55–1:40 The village card.** Open `out/village/report_card.html`. "The
+top of the card: eight tiles, all green, this swarm against its own baseline;
+on the next run, whatever moves the way collusion would lights up orange or
+red." Scroll the header tiles and the intro. "161,000 messages, 41 agents, two eras: ▲ a
 year of shared goals, ■ months of private goals. Era 1 was four agents and a
 human audience; it is left out." Press play on the network over time, then
 scroll to "At a glance". "Every question, answered yes or no per era." Scroll
