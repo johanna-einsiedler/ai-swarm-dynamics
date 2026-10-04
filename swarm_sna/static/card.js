@@ -132,21 +132,28 @@
   }
 
   function drawForce(g, nodeData, linkData, w, h, title, arrows, tipRows, size, edgeTip) {
-    const nodes = nodeData.map(d => Object.assign({}, d)), byId = new Map(nodes.map(d => [d.id, d]));
-    const links = linkData.filter(l => byId.has(l.source) && byId.has(l.target)).map(l => Object.assign({}, l));
+    const all = nodeData.map(d => Object.assign({}, d)), byId = new Map(all.map(d => [d.id, d]));
+    // the strongest ties only: about three per agent; an agent with none of them is counted, not drawn
+    const links = linkData.filter(l => byId.has(l.source) && byId.has(l.target)).sort((a, b) => b.w - a.w).slice(0, Math.max(24, 3 * all.length)).map(l => Object.assign({}, l));
+    const tied = new Set(links.flatMap(l => [l.source, l.target]));
+    const nodes = all.filter(d => tied.has(d.id)), isolated = all.length - nodes.length;
+    const subtitle = isolated ? `${isolated} agent${isolated > 1 ? "s" : ""} without a tie among the strongest not drawn` : "";
     const wmax = d3.max(links, l => l.w) || 1, smax = d3.max(nodes, size) || 1;
     const r = d => 4 + 15 * Math.sqrt(size(d) / smax);
-    const k = Math.min(w, h), n = nodes.length;  // forces scale with the panel, so a few agents still fill it, and ease off as agents multiply
+    const k = Math.min(w, h), n = Math.max(1, nodes.length);  // forces scale with the panel, so a few agents still fill it, and ease off as agents multiply
     const sim = d3.forceSimulation(nodes)
-      .force("link", d3.forceLink(links).id(d => d.id).distance(l => k * (0.16 + 0.34 * (1 - l.w / wmax))).strength(l => 0.15 + 0.6 * l.w / wmax))
-      .force("charge", d3.forceManyBody().strength(-2 * k * Math.min(1, 12 / n))).force("center", d3.forceCenter(w / 2, h / 2 + 8)).force("collide", d3.forceCollide(d => r(d) + 7)).stop();
-    for (let i = 0; i < 300; i++) sim.tick();
+      .force("link", d3.forceLink(links).id(d => d.id).distance(l => k * (0.14 + 0.3 * (1 - l.w / wmax))).strength(l => 0.08 + 0.3 * l.w / wmax))
+      .force("charge", d3.forceManyBody().strength(-1.6 * k * Math.min(1, 12 / n)))
+      .force("x", d3.forceX(w / 2).strength(0.1)).force("y", d3.forceY(h / 2 + 8).strength(0.1))  // gravity keeps the loosely tied in the picture
+      .force("collide", d3.forceCollide(d => r(d) + 6).iterations(2)).stop();
+    for (let i = 0; i < 400; i++) sim.tick();
     // Fit the layout to the panel by scaling and centring it, never by clamping: clamping piles the outer agents onto the edge.
-    const xs = d3.extent(nodes, d => d.x), ys = d3.extent(nodes, d => d.y), padX = 52, padTop = 36, padBottom = 16;
+    const xs = d3.extent(nodes, d => d.x), ys = d3.extent(nodes, d => d.y), padX = 52, padTop = 50, padBottom = 16;
     const s = Math.min((w - 2 * padX) / Math.max(1, xs[1] - xs[0]), (h - padTop - padBottom) / Math.max(1, ys[1] - ys[0]), 1.5);
     const offX = padX + ((w - 2 * padX) - (xs[1] - xs[0]) * s) / 2, offY = padTop + ((h - padTop - padBottom) - (ys[1] - ys[0]) * s) / 2;
     nodes.forEach(d => { d.x = offX + (d.x - xs[0]) * s; d.y = offY + (d.y - ys[0]) * s; });
     g.append("text").attr("x", 8).attr("y", 16).attr("fill", P.ink).attr("font-size", 12).attr("font-weight", 600).text(title);
+    if (subtitle) g.append("text").attr("x", 8).attr("y", 30).attr("fill", P.muted).attr("font-size", 10.5).text(subtitle);
     if (arrows) g.append("defs").append("marker").attr("id", "arrow").attr("viewBox", "0 -4 8 8").attr("refX", 8).attr("markerWidth", 7).attr("markerHeight", 7).attr("orient", "auto")
       .append("path").attr("d", "M0,-3.5L8,0L0,3.5").attr("fill", P.muted);
     const end = l => { // shorten to the target's rim so an arrowhead is visible
