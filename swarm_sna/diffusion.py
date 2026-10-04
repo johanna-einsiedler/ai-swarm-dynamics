@@ -224,6 +224,11 @@ def run(in_dir, n_perm=N_PERM, seed=0):
     names = sorted(events[events.actor_class == "agent"].actor.unique())
     code = {a: i for i, a in enumerate(names)}
     fu = first_uses(events)
+    if fu.empty and (in_dir / "diffusion_adoptions.csv").exists():
+        # The published form of a run: the message text is gone but the adoptions it yielded are not, so the analysis is redone from them.
+        a = pd.read_csv(in_dir / "diffusion_adoptions.csv").rename(columns={"agent": "actor", "first_use": "ts", "first_use_event_id": "event_id"})
+        fu = a[["item", "actor", "ts", "event_id"]].assign(ts=lambda x: pd.to_datetime(x.ts)).sort_values(["item", "ts"]).reset_index(drop=True)
+        print(f"no message text in events.parquet; redoing the analysis from the {len(fu):,} adoptions in diffusion_adoptions.csv")
     if fu.empty:
         return _nothing(in_dir, "no traceable tokens (links, file names, backticked terms) in this transcript")
     items = select_items(fu)

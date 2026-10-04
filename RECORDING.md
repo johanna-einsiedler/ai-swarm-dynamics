@@ -18,7 +18,9 @@ tool brings that to agent transcripts."
 synthetic: eight agents, two teams, planted reciprocity and team preference,
 no hierarchy planted." Open `out/toy/report_card.html`. Point at the glance
 list: reciprocity above chance, own-kind above chance, hierarchy within
-chance. "It finds the two things I planted and not the one I didn't."
+chance. "It finds the two things I planted and not the one I didn't." Point at the
+panel on top. "And read against AI Village, the baseline that ships with the
+tool, the team preference I planted shows up red."
 
 **0:55–1:40 The village card.** Open `out/village/report_card.html`. "The
 top of the card: eight tiles, all green, this swarm against its own baseline;

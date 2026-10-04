@@ -8,7 +8,7 @@ set -e
 .venv/bin/swarm-sna hierarchy out/village --by era --permutations 1000
 .venv/bin/swarm-sna trends out/village
 .venv/bin/swarm-sna diffusion out/village --permutations 1000
-.venv/bin/swarm-sna card out/village --title "AI Village" --intro meta/intro.md --baseline meta/baseline.csv   # the baseline was written from this run with --save-baseline; rewrite it only on purpose
+.venv/bin/swarm-sna card out/village --title "AI Village" --intro meta/intro.md   # read against the AI Village baseline shipped with the tool; after a full re-run, --save-baseline swarm_sna/data/baseline_ai_village.csv refreshes it
 .venv/bin/swarm-sna diffusion out/toy --permutations 300
 .venv/bin/swarm-sna card out/toy --title "Toy swarm (synthetic, 8 agents)" --meta examples/toy   # not meta/: the village eras and benchmarks do not apply to the toy
 mkdir -p examples/village-results

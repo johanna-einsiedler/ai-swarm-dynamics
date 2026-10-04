@@ -11,10 +11,13 @@ One null gives the verdicts (`--null`); the other is in each card's drawer, the
 histograms switch between them, and the reciprocity card says why they can
 disagree. Each statistic is set beside its published values in animal and human
 networks (`<meta>/benchmarks.csv`), drawn on one scale where the definitions
-allow it and tabled in a drawer. With `--baseline` the card opens with a status
-panel: each indicator against the range it covered in a run taken as normal
-(`--save-baseline` writes that file), green, orange or red. A methods card at
-the end says how every number is made. A group
+allow it and tabled in a drawer; the table ships with the tool
+(`swarm_sna/data/benchmarks.csv`) and `<meta>/benchmarks.csv` overrides it. The
+card opens with a status panel: each indicator against the range it covered in
+a baseline swarm, green, orange or red. The default baseline is AI Village,
+shipped with the tool; `--baseline` takes another file, written by
+`--save-baseline` from a run taken as normal, or `none`. A methods card at the
+end says how every number is made. A group
 (era) whose median day has fewer than `--min-agents` agents is left out
 (`--thin drop`) or shown but not judged (`--thin show`): a network statistic on
 four nodes has nothing to say. Eras get a marker and a name from
@@ -38,6 +41,8 @@ ALPHA = 0.05
 MIN_AGENTS = 6
 MIN_AD = 4
 STATIC = Path(__file__).parent / "static"
+DATA = Path(__file__).parent / "data"  # the benchmark table and the AI Village baseline ship with the tool
+BUILTIN_BASELINES = {"ai-village": DATA / "baseline_ai_village.csv"}
 DEFAULT_NULL = "target"
 NULL_NAMES = {"target": "shuffling who was addressed", "speaker": "shuffling who spoke"}
 NULL_MEANING = {
@@ -154,8 +159,10 @@ class Benchmarks:
 
 
 def load_benchmarks(meta):
-    path = Path(meta) / "benchmarks.csv" if meta else None
-    return Benchmarks(pd.read_csv(path, dtype=str).fillna("")) if path is not None and path.exists() else None
+    """<meta>/benchmarks.csv when there is one, else the table shipped with the tool."""
+    own = Path(meta) / "benchmarks.csv" if meta else None
+    path = own if own is not None and own.exists() else DATA / "benchmarks.csv"
+    return Benchmarks(pd.read_csv(path, dtype=str).fillna("")) if path.exists() else None
 
 
 def _points(spec, curve=False):
@@ -975,8 +982,15 @@ def write_baseline(path, inds, source):
     print(f"wrote {path}: the baseline range of {len(rows)} indicators")
 
 
+def resolve_baseline(arg):
+    """'ai-village' (the default) -> the file shipped with the tool; 'none' or empty -> no panel; anything else -> that path."""
+    if not arg or str(arg).lower() == "none":
+        return None
+    return BUILTIN_BASELINES.get(str(arg).lower(), Path(arg))
+
+
 def load_baseline(path):
-    if not path or not Path(path).exists():
+    if path is None or not Path(path).exists():
         return None
     b = pd.read_csv(path)
     return {r["indicator"]: r for r in b.to_dict("records")}
@@ -991,10 +1005,14 @@ def _fmt_value(v, fmt):
     return f"{v:+.2f}" if fmt == "num" else f"{v:.0%}"
 
 
-def status_card(inds, base, lab, path):
-    """Headline tiles: each indicator against the baseline range, green inside it, orange or red beyond it the worrying way."""
+def status_card(inds, base, lab, path, title=""):
+    """Headline tiles: each indicator against the baseline range, green inside it, orange or red beyond it the worrying way.
+    The wording says whether the baseline is this swarm's own or another swarm's (by default AI Village)."""
     if not inds:
         return ""
+    source = next((str(r.get("written_from", "")) for r in base.values() if r.get("written_from")), "") if base else ""
+    own = bool(source) and source == (title or "")
+    against = f"the {esc(source)} baseline" if source and not own else "the baseline"
     tiles, flagged = [], []
     for i in inds:
         row = base.get(i["key"]) if base else None
@@ -1014,17 +1032,20 @@ def status_card(inds, base, lab, path):
     if base is None:
         verdict = f'<span class="chip unknown">no baseline</span> No file at <code>{esc(str(path))}</code>; the tiles show the values uncoloured.'
     elif not flagged:
-        verdict = f'<span class="chip yes">all {n} within the baseline</span> Nothing here has moved from where the baseline swarm had it.'
+        verdict = f'<span class="chip yes">all {n} within {against}</span> ' + ("Nothing here has moved from where this swarm had it." if own else f"Nothing here lies beyond what {esc(source)} showed, in the direction coordination would push.")
     else:
-        verdict = f'<span class="chip {"red" if any(t == "red" for _, t in flagged) else "no below"}">{len(flagged)} of {n} beyond the baseline</span> ' + ", ".join(f"{esc(name)} ({tile})" for name, tile in flagged) + "."
-    source = next((str(r.get("written_from", "")) for r in base.values() if r.get("written_from")), "") if base else ""
+        verdict = f'<span class="chip {"red" if any(t == "red" for _, t in flagged) else "no below"}">{len(flagged)} of {n} beyond {against}</span> ' + ", ".join(f"{esc(name)} ({tile})" for name, tile in flagged) + "."
     para = (
         '<p class="meaning">Each tile sets this run against a baseline: the range an indicator covered across the eras of a swarm taken to be behaving normally'
         + (f" (written from <b>{esc(source)}</b>)" if source else "")
         + ". The network statistics and the steepness enter as their excess over chance, which does not move with the roster the way the raw shares do; the rest are plain shares. "
         "Green: inside that range, or beyond it only in the direction a coordinating subset would not push. Orange: beyond the range in the worrying direction by more than the first tolerance in the file. Red: by more than the second. "
         "The worrying direction is fixed per indicator: more returned mentions, own-kind share, selectivity, closure, steepness and first-adopter concentration; fewer asks answered and fewer claims backed. "
-        "The tolerances are judgment calls, written into the file to be argued with, and a tile that lights up is a reason to look, not a finding: the eras of this card show how far a change of roster or goals moves the same numbers for benign reasons. Hover a tile for the numbers behind it.</p>"
+        "The tolerances are judgment calls, written into the file to be argued with, and a tile that lights up is a reason to look, not a finding. "
+        + ("The baseline here was written from this very run, so the tiles are green by construction; they are meant for the next run of this swarm, and the eras of this card show how far a change of roster or goals moves the same numbers for benign reasons. "
+           if own else
+           f"This swarm is read against <b>{esc(source)}</b>, a different swarm under its own scaffolding, so a lit tile says where it differs from {esc(source)} in the direction coordination would push, not that something is wrong; a different roster, goal or set of tools moves these numbers too. Once this swarm is known to behave, <code>--save-baseline</code> writes its own file, and <code>--baseline</code> reads it, so later runs compare it with itself. ")
+        + "Hover a tile for the numbers behind it.</p>"
     )
     return _card("Is this swarm behaving as expected?", verdict, '<div class="status">' + "".join(tiles) + "</div>" + para, "status")
 
@@ -1055,9 +1076,9 @@ def methods_card(n_perm, null, min_agents):
         ("The kind of goal",
          "Rates per era and kind of goal, from <code>meta/goals.csv</code>, each with a 95% interval from resampling days within the era and kind 1,000 times, since requests cluster by day. A logistic model of whether a given agent answers, with log group size and being addressed held fixed, gives the odds of each kind against the era's commonest kind, with its interval from 200 refits over resampled days."),
         ("The comparisons with animal and human networks",
-         "<code>meta/benchmarks.csv</code> holds published values as the sources report them; a dagger marks one taken from a secondary summary. A value is drawn beside the agents' only where the definitions match: event-based reciprocity shares, homophily written as cross-kind mixing over chance (one minus the own-kind share, over one minus its null mean), steepness, Landau's h and triangle transitivity, per-person helping rates by group size, and helping rates with and without a record of helping others. Correlations and coefficients of other kinds stay in the table."),
+         "The benchmark table shipped with the tool (<code>swarm_sna/data/benchmarks.csv</code>, overridden by <code>&lt;meta&gt;/benchmarks.csv</code> when present) holds published values as the sources report them; a dagger marks one taken from a secondary summary. A value is drawn beside the agents' only where the definitions match: event-based reciprocity shares, homophily written as cross-kind mixing over chance (one minus the own-kind share, over one minus its null mean), steepness, Landau's h and triangle transitivity, per-person helping rates by group size, and helping rates with and without a record of helping others. Correlations and coefficients of other kinds stay in the table."),
         ("The status panel and the baseline",
-         f"The panel at the top sets each indicator against the range it covered across the eras of a baseline run (<code>--save-baseline</code> writes the file, <code>--baseline</code> reads it). The network statistics and steepness enter as their excess over the null mean; the rest as plain shares. A tile turns orange when the value lies beyond the range, in the direction a coordinating subset would push it, by more than the file's first tolerance, and red beyond the second; the defaults are {o_num:g} and {r_num:g} for the excess statistics and {o_pct:.0%} and {r_pct:.0%} points for the shares, judgment calls meant to be edited."),
+         f"The panel at the top sets each indicator against the range it covered across the eras of a baseline swarm. By default that is AI Village, eras 2 and 3, shipped with the tool (<code>swarm_sna/data/baseline_ai_village.csv</code>); <code>--save-baseline</code> writes such a file from any run, <code>--baseline</code> reads one or takes <code>none</code>. The network statistics and steepness enter as their excess over the null mean; the rest as plain shares. A tile turns orange when the value lies beyond the range, in the direction a coordinating subset would push it, by more than the file's first tolerance, and red beyond the second; the defaults are {o_num:g} and {r_num:g} for the excess statistics and {o_pct:.0%} and {r_pct:.0%} points for the shares, judgment calls meant to be edited."),
         ("Software",
          "Everything on this card is produced by <code>swarm-sna</code> (Python, pandas and numpy; figures in D3): <code>extract</code> builds the event and mention tables, <code>label</code> and <code>verify</code> the request and response tables, <code>report</code> the network statistics and their nulls, <code>helping</code>, <code>hierarchy</code>, <code>trends</code> and <code>diffusion</code> the rest, and <code>card</code> assembles this page from whatever is in the directory. The quality card above says how far the labels can be trusted."),
     ]
@@ -1149,7 +1170,7 @@ def _static(name):
     return (STATIC / name).read_text().replace("</script", "<\\/script")
 
 
-def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN_AGENTS, thin="drop", null=DEFAULT_NULL, meta="meta", intro=None, baseline=None, save_baseline=None):
+def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN_AGENTS, thin="drop", null=DEFAULT_NULL, meta="meta", intro=None, baseline="ai-village", save_baseline=None):
     d = Path(in_dir)
     ev = pd.read_parquet(d / "events.parquet")
     agents = pd.read_parquet(d / "agents.parquet")
@@ -1193,7 +1214,8 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
     inds = indicator_values(data, group, lab, null, backed)
     if save_baseline:
         write_baseline(save_baseline, inds, title or d.name)
-    status_html = status_card(inds, load_baseline(baseline), lab, baseline) if baseline else ""
+    bpath = resolve_baseline(baseline)
+    status_html = status_card(inds, load_baseline(bpath), lab, bpath, title or d.name) if bpath is not None else ""
     methods_html = methods_card(n_perm, null, min_agents)
     if bench:
         data["bench"] = bench.payload  # filled while the cards were built
