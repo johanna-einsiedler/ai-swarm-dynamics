@@ -2,11 +2,17 @@
 
 An item is a distinctive token (a URL, a file or tool name, a backticked term)
 that several agents come to use. For each item, the agents are ordered by first
-use. The statistic is how much tie weight each adopter had to the agents who
-adopted before it, summed over adopters (Franz & Nunn 2009; Hoppitt & Laland
-2013, OADA). The null permutes the order of adoption among the same agents, so
-who adopts is fixed and only the order is tested: if ties carry information,
-later adopters should be the ones connected to earlier ones.
+use. At each adoption after the first, the adopter is compared with the agents
+that had not yet adopted: its rank among them by tie weight to those who already
+had (0 = least tied, 1 = most tied). The statistic is the mean rank over
+adoptions, 0.5 under random order. This is the order-of-acquisition idea of
+Franz & Nunn (2009) and Hoppitt & Laland (2013, OADA) as a rank test. The null
+permutes the order of adoption among the same agents, so who adopts is fixed
+and only the order is tested: if ties carry information, the next adopter should
+be among the candidates most tied to the earlier ones.
+
+(The total tie weight among adopters, which an earlier version summed over
+adopters, is the same for every order; it cannot be tested.)
 """
 import re
 from pathlib import Path
@@ -61,6 +67,8 @@ def first_uses(events):
 
 
 def select_items(fu):
+    if fu.empty:  # a transcript with no links, file names or backticked terms
+        return pd.DataFrame(columns=["adopters", "first", "last", "spread_days"])
     g = fu.groupby("item").agg(adopters=("actor", "nunique"), first=("ts", "min"), last=("ts", "max"))
     g["spread_days"] = (g["last"] - g["first"]).dt.total_seconds() / 86400
     keep = g[(g.adopters >= MIN_ADOPTERS) & (g.adopters <= MAX_ADOPTERS) & g.spread_days.between(MIN_SPREAD_DAYS, MAX_SPREAD_DAYS)]
@@ -75,15 +83,27 @@ def tie_matrix(mentions, names, start, end):
     return W
 
 
+def mean_rank(orders, S):
+    """orders: (P, n) adopter indices, one row per adoption order. -> (P,) mean rank of each adopter
+    among the agents still to adopt, by tie weight to those who already had; 0.5 under random order."""
+    n = orders.shape[1]
+    M = S[orders[:, :, None], orders[:, None, :]]  # ties between adopters, rows and columns in adoption order
+    C = np.cumsum(M, axis=2)  # C[:, i, k - 1] = ties of adopter i to the first k adopters
+    ranks = []
+    for k in range(1, n - 1):  # the last adoption has no rival left
+        c = C[:, k:, k - 1]  # candidates still to adopt; column 0 is the one that did
+        me, others = c[:, :1], c[:, 1:]
+        ranks.append(((others < me).sum(1) + 0.5 * (others == me).sum(1)) / others.shape[1])
+    return np.mean(ranks, axis=0)
+
+
 def oada(order, W, rng, n_perm=N_PERM):
-    """order: adopter indices in adoption order. -> (observed, null mean, null sd, p one-sided)."""
-    n = len(order)
-
-    def stat(o):
-        return sum(W[o[k], o[:k]].sum() + W[o[:k], o[k]].sum() for k in range(1, n))  # ties in either direction to earlier adopters
-
-    obs = stat(order)
-    null = np.array([stat(rng.permutation(order)) for _ in range(n_perm)])
+    """order: adopter indices in adoption order. -> (observed, null mean, null sd, p one-sided, z)."""
+    S = W + W.T  # a tie in either direction counts
+    np.fill_diagonal(S, 0)
+    orders = np.vstack([order] + [rng.permutation(order) for _ in range(n_perm)])
+    vals = mean_rank(orders, S)
+    obs, null = vals[0], vals[1:]
     sd = null.std()
     return obs, null.mean(), sd, ((null >= obs).sum() + 1) / (n_perm + 1), (obs - null.mean()) / sd if sd > 0 else np.nan
 
@@ -107,16 +127,21 @@ def run(in_dir, n_perm=N_PERM, seed=0):
             continue
         obs, mu, sd, p, z = oada(idx, W, rng, n_perm)
         rows.append({"item": item, "adopters": len(idx), "first_adopter": order.actor.iloc[0], "first": meta["first"], "spread_days": meta.spread_days, "observed": obs, "null_mean": mu, "null_sd": sd, "z": z, "p": p})
-    t = pd.DataFrame(rows)
+    t = pd.DataFrame(rows, columns=["item", "adopters", "first_adopter", "first", "spread_days", "observed", "null_mean", "null_sd", "z", "p"])
     t.to_csv(in_dir / "diffusion_items.csv", index=False)
+    if t.empty:  # nothing spread, or no adopter had a prior tie to another: the card reports it as not testable
+        (in_dir / "diffusion_summary.csv").write_text("items,mean_rank,share_p_below_05,mean_z,stouffer_z\n0,,,,\n")
+        print(f"no item to test; wrote {in_dir}/diffusion_items.csv, diffusion_summary.csv")
+        return
     z = t.z.dropna()
     share = (t.p < 0.05).mean()
     pooled = z.mean() * np.sqrt(len(z))  # Stouffer
     print(f"\n{len(t)} items tested against {n_perm} random adoption orders each")
+    print(f"mean rank of the next adopter among the agents still to adopt, by ties to earlier adopters: {t.observed.mean():.3f} (0.5 by chance)")
     print(f"items where adoption order follows ties (p < 0.05): {share:.1%} (5% expected by chance)")
     print(f"mean z {z.mean():+.2f}; Stouffer combined z {pooled:+.1f}")
     print("\nstrongest cascades:")
-    print(t.nsmallest(8, "p")[["item", "adopters", "first_adopter", "spread_days", "z", "p"]].round(3).to_string(index=False))
+    print(t.nsmallest(8, "p")[["item", "adopters", "first_adopter", "spread_days", "observed", "z", "p"]].round(3).to_string(index=False))
     figures.diffusion(t, in_dir / "fig_diffusion.png")
-    (in_dir / "diffusion_summary.csv").write_text(f"items,share_p_below_05,mean_z,stouffer_z\n{len(t)},{share:.4f},{z.mean():.4f},{pooled:.4f}\n")
+    (in_dir / "diffusion_summary.csv").write_text(f"items,mean_rank,share_p_below_05,mean_z,stouffer_z\n{len(t)},{t.observed.mean():.4f},{share:.4f},{z.mean():.4f},{pooled:.4f}\n")
     print(f"\nwrote {in_dir}/diffusion_items.csv, diffusion_summary.csv, fig_diffusion.png")
