@@ -7,7 +7,11 @@ a drawer of the verbatim evidence behind the labels. It is built from whatever
 the other commands have written to the directory; a question whose layer has
 not been run says which command would answer it.
 
-One null is the default (`--null`); the other is in each card's drawer. A group
+One null gives the verdicts (`--null`); the other is in each card's drawer, the
+histograms switch between them, and the reciprocity card says why they can
+disagree. Each statistic is set beside its published values in animal and human
+networks (`<meta>/benchmarks.csv`), drawn on one scale where the definitions
+allow it and tabled in a drawer. A group
 (era) whose median day has fewer than `--min-agents` agents is left out
 (`--thin drop`) or shown but not judged (`--thin show`): a network statistic on
 four nodes has nothing to say. Eras get a marker and a name from
@@ -15,15 +19,16 @@ four nodes has nothing to say. Eras get a marker and a name from
 """
 import html
 import json
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from .diffusion import item_kind
 from .figures import FAINT, INK, MUTED, NAMED_FAMILIES, NULL_FILL, OBSERVED, OTHER, SERIES
 from .helping import SIZE_BINS, SIZE_LABELS, helpful, logit_fit
 from .report import LABELS as STAT_LABELS
-from .trends import SERIES as TREND_SERIES
 
 ALPHA = 0.05
 MIN_AGENTS = 6
@@ -82,9 +87,10 @@ def _answer(label, yes, outcome=None):
     return f'<span class="chip {cls}">{esc(label)}: {"yes" if yes else "no"}</span>'
 
 
-def _fig(kind, grouped=False):
+def _fig(kind, grouped=False, **attrs):
     """A placeholder the page's script fills with a D3 figure; `grouped` ones re-render when the group filter changes."""
-    return f'<div class="fig" data-fig="{kind}"{" data-groups=1" if grouped else ""}></div>'
+    extra = "".join(f' data-{k}="{esc(str(v))}"' for k, v in attrs.items())
+    return f'<div class="fig" data-fig="{kind}"{" data-groups=1" if grouped else ""}{extra}></div>'
 
 
 def _table(df, formats=None, raw=(), classes=None):
@@ -117,33 +123,87 @@ def _card(title, verdict, body, anchor):
 
 def _links(text):
     """Escaped text with [label](url) turned into links."""
-    import re
-
     return re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r'<a href="\2">\1</a>', esc(text))
 
 
+BENCH_PANELS = {  # per card: the statistics of ours a published value can sit beside, each with the axis it is drawn on
+    "reciprocity": [("reciprocity", "share of interaction that is returned in kind")],
+    "same_family_share": [("cross_kind_mixing", "mixing across kinds, as a share of what chance would give (1 = no preference)")],
+    "hierarchy": [("steepness", "steepness (0 flat, 1 a strict ladder)"), ("landau_h", "linearity, Landau's h (1 = every triad ordered)"), ("triangle_transitivity", "triangle transitivity (1 = no cycles)")],
+    "bystander": [("p_each_agent_responds", "a given one answers"), ("p_any_agent_responds", "anyone answers")],
+    "helping": [("direct reciprocity", "direct reciprocity: has the asker helped this one lately?"), ("indirect reciprocity", "indirect reciprocity: is the asker known to help others?")],
+}
+BENCH_LAYOUT = {"bystander": "curves", "helping": "pairs"}  # the rest are ladders: one row per value, on one axis
+BENCH_FORMAT = {"bystander": "pct", "helping": "pct"}
+
+
+class Benchmarks:
+    """<meta>/benchmarks.csv: published values of the same statistics in animal and human networks, per card.
+    `table` is the file; `payload` collects, per card, the rows that can be drawn beside the agents' own values."""
+
+    def __init__(self, table):
+        for c in ("stat", "who", "short", "plot"):
+            if c not in table.columns:
+                table[c] = ""
+        self.table = table
+        self.payload = {}
+
+
 def load_benchmarks(meta):
-    """<meta>/benchmarks.csv: published values of the same statistics in animal and human networks, per card."""
     path = Path(meta) / "benchmarks.csv" if meta else None
-    return pd.read_csv(path, dtype=str).fillna("") if path is not None and path.exists() else None
+    return Benchmarks(pd.read_csv(path, dtype=str).fillna("")) if path is not None and path.exists() else None
 
 
-def _benchmarks(bench, card, agents_line=""):
-    """The comparison section for one card: the agents' own numbers, the comparability note, the published values."""
+def _points(spec, curve=False):
+    """The `plot` column: '0.45' | 'third grade:0.67;middle school:0.10' | '0.258..0.776' -> points for the figure.
+    On a curve the label is the group size, so it becomes x."""
+    out = []
+    for part in [x.strip() for x in spec.split(";") if x.strip()]:
+        label, _, num = part.rpartition(":")
+        if ".." in num:
+            lo, hi = num.split("..")
+            out.append({"label": label.strip(), "lo": float(lo), "hi": float(hi)})
+        else:
+            pt = {"label": label.strip(), "v": float(num)}
+            if curve:
+                pt["x"] = float(label)
+            out.append(pt)
+    return out
+
+
+def _benchmarks(bench, card, agents_line="", ours=None):
+    """The comparison section for one card: a paragraph (the agents' own numbers, then how far the published ones compare),
+    the published values drawn on the same scale as the agents' where the definitions allow it, and the table in a drawer."""
     if bench is None:
         return ""
-    b = bench[bench.card == card]
+    b = bench.table[bench.table.card == card]
     if b.empty:
         return ""
     notes = " ".join(b[b.kind == "note"].measure)
     rows = b[b.kind == "value"]
     body = f'<p class="meaning">{(agents_line + " ") if agents_line else ""}{esc(notes)}</p>'
+    layout = BENCH_LAYOUT.get(card, "ladder")
+    drawn = [
+        {"stat": r.stat, "who": r.who, "label": r.short or r.setting, "measure": r.measure, "value": r.value, "source": f"{r.source} {r.check}".strip(), "points": _points(r.plot, layout == "curves")}
+        for r in rows.itertuples() if r.plot and r.stat
+    ]
+    if drawn and ours:
+        bench.payload[card] = {"layout": layout, "format": BENCH_FORMAT.get(card, "num"), "panels": [{"key": k, "label": lb} for k, lb in BENCH_PANELS.get(card, [])], "rows": drawn, "ours": ours}
+        body += _fig("bench", grouped=True, card=card)
     if len(rows):
         t = pd.DataFrame({"statistic": rows.measure, "setting": rows.setting, "value": rows.value, "source": [f"{s} {c}".strip() for s, c in zip(rows.source, rows.check)]})
-        body += _table(t)
-        if (rows.check == "†").any():
-            body += '<p class="meaning">† taken from a secondary summary rather than the paper itself.</p>'
+        foot = '<p class="meaning">† taken from a secondary summary rather than the paper itself.</p>' if (rows.check == "†").any() else ""
+        body += _drawer("The published values, as a table", _table(t) + foot)
     return "<h3>Compared with animal and human networks</h3>" + body
+
+
+def _bin_x(label):
+    """A group-size bin label ('5-8', '16+') as one number on an axis."""
+    s = str(label)
+    if "-" in s:
+        a, b = s.split("-")
+        return float(np.sqrt(float(a) * float(b)))
+    return float(s.rstrip("+")) * 1.25 if s.endswith("+") else float(s)
 
 
 def _missing(title, command, anchor):
@@ -292,11 +352,12 @@ def null_text(n_perm, null):
     other = [k for k in NULL_NAMES if k != null][0]
     return (
         f'<p class="meaning">Every verdict on this card is observed against a null model: the raw event stream is shuffled {n_perm:,} times within room and day and the statistic is recomputed on each shuffle. '
-        f"The shuffle is <b>{NULL_NAMES[null]}</b>, which {NULL_MEANING[null]}. A pattern counts only if it beats the shuffle. A second shuffle, {NULL_NAMES[other]}, {NULL_MEANING[other]}; each verdict says whether it agrees.</p>"
+        f"The verdicts use <b>{NULL_NAMES[null]}</b>, which {NULL_MEANING[null]}. The histograms switch to the second shuffle, <b>{NULL_NAMES[other]}</b>, which {NULL_MEANING[other]}. "
+        f"The two hold different things fixed, so they can answer differently; each card says when they do, and the paragraph under the histograms says why.</p>"
     )
 
 
-def _robust(main, alt, null, lab):
+def _robust(main, alt, null, lab, explained=False):
     """One sentence on whether the other shuffle gives the same yes-or-no answers."""
     if alt.empty:
         return ""
@@ -308,11 +369,53 @@ def _robust(main, alt, null, lab):
             differ.append((r.group, a.outcome.iloc[0]))
     if not differ:
         return f" The other shuffle, {NULL_NAMES[other]}, gives the same answer."
-    reading = "the pattern is more than partner choice but not more than who talks how much" if null == "target" else "the pattern is more than who talks how much but not more than partner choice"
-    return f" The other shuffle, {NULL_NAMES[other]}, answers differently in " + " and ".join(f"{lab(g)} ({WORD[o]})" for g, o in differ) + f": {reading}."
+    where = " and ".join(f"{lab(g)} ({WORD[o]})" for g, o in differ)
+    tail = "and the paragraph under the histograms says why" if explained else "and the reciprocity card says what each shuffle holds fixed"
+    return f" The other shuffle, {NULL_NAMES[other]}, answers differently in {where}: its numbers are in the drawer below, {tail}."
 
 
-def network_cards(d, group, lab, drop, thin, null, n_perm, bench):
+def _why_shuffles(judged, alt, lab, nets, null):
+    """Why the two shuffles can disagree, with reciprocity as the worked case: in the groups where shuffling who was
+    addressed is beaten and shuffling who spoke is not, being addressed tracks writing more closely than it tracks
+    addressing others, so handing out mentions in proportion to writing makes the shuffled networks more mutual than the real one."""
+    intro = (
+        '<p class="meaning"><b>Why the two shuffles can disagree.</b> Shuffling who was addressed keeps how many mentions each agent sends and receives and reassigns only whom they go to: '
+        "beating it means pairs return each other's mentions beyond what their volumes predict. Shuffling who spoke keeps each message's mentions and each agent's message count: under it an agent sends mentions in proportion to how much it writes. "
+    )
+    cases = []
+    for r in judged.itertuples():
+        a = alt[alt.group == r.group]
+        if a.empty:
+            continue
+        tv, sv = (r, a.iloc[0]) if null == "target" else (a.iloc[0], r)
+        cases.append((r.group, tv, sv))
+    if not cases:
+        return intro + "</p>"
+    split = [(g, tv, sv) for g, tv, sv in cases if tv.outcome == "above" and sv.outcome == "below"]
+    if not split:
+        agree = all((tv.outcome == "above") == (sv.outcome == "above") for _, tv, sv in cases)
+        return intro + ("Here the two agree, so the answer does not turn on which is held fixed." if agree else "Here they answer differently; the drawer below has the second shuffle's numbers.") + "</p>"
+    corr, ex = [], []
+    for g, _, _ in split:
+        net = nets.get(g) if nets else None
+        if not net or len(net["nodes"]) < 4:
+            continue
+        nd = pd.DataFrame(net["nodes"])
+        corr.append(f"in {lab(g)} the mentions an agent receives correlate {nd['in'].corr(nd.msgs):.2f} with its messages and {nd['in'].corr(nd.out):.2f} with the mentions it sends")
+        top, swarm = nd.loc[nd["in"].idxmax()], (nd.out.sum() / nd.msgs.sum() if nd.msgs.sum() else 0)
+        if top.msgs and top.out / top.msgs < swarm:
+            ex.append(f"in {lab(g)} the most-addressed agent, {esc(str(top.id))}, received {top['in']:,.0f} mentions and sent {top.out / top.msgs:.1f} per message against {swarm:.1f} for the swarm")
+    text = intro + "The two part ways when being addressed tracks writing more closely than it tracks addressing others" + (" (" + "; ".join(corr) + ")" if corr else "") + "."
+    if ex:
+        text += " For instance, " + "; ".join(ex) + "."
+    more = "; ".join(f"{lab(g)}: {sv.null_mean:.3f} expected against {sv.observed:.3f} observed" for g, _, sv in split)
+    less = " and ".join(f"{tv.null_mean:.3f}" for _, tv, _ in split)
+    text += f" Handing out mentions in proportion to writing therefore makes the shuffled networks more mutual than the real one ({more}), while handing them out in proportion to mentions sent makes them less so ({less})."
+    text += " Read together: mentions are returned beyond what volume predicts, but the agents everyone addresses do not address back as much as their talk would allow.</p>"
+    return text
+
+
+def network_cards(d, group, lab, drop, thin, null, n_perm, bench, nets=None):
     path = d / f"report_{group}.csv"
     if not path.exists():
         return [_missing(q, "swarm-sna report", s) for s, q, _ in NETWORK_CARDS]
@@ -327,7 +430,7 @@ def network_cards(d, group, lab, drop, thin, null, n_perm, bench):
         judged = main[~main.thin]
         parts = [f"{_answer(lab(r.group), r.outcome == 'above', r.outcome)} &ndash; {WORD[r.outcome]}, {r.observed:.3f} against {r.null_mean:.3f} expected ({_p(r.p)})." for r in judged.itertuples()]
         verdict = " ".join(parts) if parts else _chip("unknown") + " No group left to judge."
-        verdict += _robust(judged, alt, null, lab) + _thin_note(thin, main.group, lab)
+        verdict += _robust(judged, alt, null, lab, explained=i == 0) + _thin_note(thin, main.group, lab)
 
         def rows(x):
             return pd.DataFrame(
@@ -339,15 +442,20 @@ def network_cards(d, group, lab, drop, thin, null, n_perm, bench):
 
         body = f'<p class="meaning">{esc(meaning)} Null: {esc(NULL_NAMES[null])}.</p>' + _table(rows(main), raw=("p", ""), classes=["thin" if th else "" for th in main.thin])
         if i == 0:
-            body += null_text(n_perm, null) + _fig("nulls", grouped=True)
+            body += null_text(n_perm, null) + _fig("nulls", grouped=True) + _why_shuffles(judged, alt, lab, nets, null)
         if i == 2:
             body += _fig("network", grouped=True)
-        agents_line = ""
+        if len(alt):
+            body += _drawer(f"Under the other shuffle: {NULL_NAMES[other]}", _table(rows(alt), raw=("p", ""), classes=["thin" if th else "" for th in alt.thin]))
+        agents_line, ours = "", None
         if stat == "same_family_share" and len(judged):  # the human rows are observed over expected, so say ours the same way
-            agents_line = "Written the human way, cross-family mentions run at " + ", ".join(f"{(1 - r.observed) / (1 - r.null_mean):.0%} of chance in {lab(r.group)}" for r in judged.itertuples()) + "."
+            ratio = {r.group: (1 - r.observed) / (1 - r.null_mean) if r.null_mean < 1 else np.nan for r in judged.itertuples()}
+            agents_line = "Written the human way, cross-family mentions run at " + ", ".join(f"{ratio[r.group]:.0%} of chance in {lab(r.group)}" for r in judged.itertuples()) + "."
+            ours = {"cross_kind_mixing": [{"label": f"{lab(r.group)}: the agents, across model families", "group": r.group, "points": [{"v": ratio[r.group]}], "null": 1.0} for r in judged.itertuples() if pd.notna(ratio[r.group])]}
         elif stat == "reciprocity" and len(judged):
             agents_line = "The agents return " + ", ".join(f"{r.observed:.2f} of mention weight in {lab(r.group)} ({r.null_mean:.2f} expected)" for r in judged.itertuples()) + "."
-        body += _benchmarks(bench, stat, agents_line)
+            ours = {"reciprocity": [{"label": f"{lab(r.group)}: the agents, mentions", "group": r.group, "points": [{"v": r.observed}], "null": r.null_mean} for r in judged.itertuples()]}
+        body += _benchmarks(bench, stat, agents_line, ours)
         chips = " ".join(_tag("thin", f"{lab(r.group)}: thin") if r.thin else _answer(lab(r.group), r.outcome == "above", r.outcome) for r in main.itertuples())
         out.append((_card(question, verdict, body, stat), (question, chips, stat)))
     return out
@@ -389,7 +497,12 @@ def hierarchy_card(d, group, lab, drop, thin, bench):
         body += _drawer("Before, during and after an imposed leader", _table(e, raw=("p",)))
     tt = main[main.statistic == "triangle_transitivity"]
     agents_line = "The agents: steepness " + ", ".join(f"{r.observed:.3f} in {lab(r.group)}" for r in st.itertuples()) + (("; triangle transitivity " + ", ".join(f"{r.observed:.2f} in {lab(r.group)}" for r in tt.itertuples())) if len(tt) else "") + "."
-    body += _benchmarks(bench, "hierarchy", agents_line)
+    ours = {}
+    for key, _ in BENCH_PANELS["hierarchy"]:
+        k = main[(main.statistic == key) & ~main.group.isin(thin)]
+        if len(k):
+            ours[key] = [{"label": f"{lab(r.group)}: the agents, directives", "group": r.group, "points": [{"v": r.observed}], "null": r.null_mean} for r in k.itertuples()]
+    body += _benchmarks(bench, "hierarchy", agents_line, ours or None)
     chips = " ".join(_tag("thin", f"{lab(g)}: thin") if g in thin else _answer(lab(g), o == "above", o) for g, o in zip(st.group, outs))
     return _card(title, verdict, body, anchor), (title, chips, anchor)
 
@@ -491,7 +604,18 @@ def helping_cards(d, group, lab, drop, bench, und):
     _, ex = _examples(d)
     if ex is not None and len(ex):
         body += _drawer(f"Evidence: {len(ex)} request-and-answer pairs, verbatim", "".join(_exchange(r) for r in ex.itertuples()))
-    body += _benchmarks(bench, "helping")
+    ours = None
+    if und:
+        lv = {(r["factor"], r["level"]): r for r in und["rates"]}
+
+        def pair(factor, a, b, label):
+            return [{"label": label, "points": [{"label": a, "v": lv[factor, a]["rate"]}, {"label": b, "v": lv[factor, b]["rate"]}]}] if (factor, a) in lv and (factor, b) in lv else []
+
+        ours = {
+            "direct reciprocity": pair("direct reciprocity", "no", "yes", "the agents: asker answered this one lately?"),
+            "indirect reciprocity": pair("indirect reciprocity", "0 answers", "5 or more", "the agents: asker answered others lately?"),
+        }
+    body += _benchmarks(bench, "helping", "", ours)
     cards = [(_card(t1, verdict, body, a1), (t1, chip, a1))]
 
     curve = pd.read_csv(d / "helping_bystander.csv")
@@ -508,11 +632,16 @@ def helping_cards(d, group, lab, drop, bench, und):
     body = '<p class="meaning">The bystander effect: the more others are present, the less likely any one of them is to help, even if the group as a whole still does. Broadcast requests only (asked of nobody in particular), compared within era, because group size and era are confounded across eras. Two curves: the chance that a given agent answers, and the chance that anyone does.</p>' + _fig("bystander", grouped=True)
     body += _drawer("The curve as a table", _table(rows, {"a given agent answers": ".0%", "anyone answers": ".0%"}))
     kept = []  # the agents' own numbers, the way the laboratory reports them: the share of the small-group rate kept in the largest group
+    ours = {key: [] for key, _ in BENCH_PANELS["bystander"]}
     for e, c in curve.groupby("era", sort=True):
         c = c.sort_values("size", key=lambda s: s.map({k: i for i, k in enumerate(SIZE_LABELS)}))
         a, b = c.p_each_agent_responds.iloc[0], c.p_each_agent_responds.iloc[-1]
         kept.append(f"{lab(f'{group} {e}')} a given agent answers {a:.0%} of broadcast requests at {c['size'].iloc[0]} agents and {b:.0%} at {c['size'].iloc[-1]} ({b / a:.0%} kept), while anyone answers {c.p_any_agent_responds.iloc[0]:.0%} and {c.p_any_agent_responds.iloc[-1]:.0%}")
-    body += _benchmarks(bench, "bystander", "In " + "; in ".join(kept) + "." if kept else "")
+        for key in ours:
+            pts = [{"label": f"{r.size} agents active", "x": _bin_x(r.size), "v": float(getattr(r, key))} for r in c.itertuples() if pd.notna(getattr(r, key))]
+            if pts:
+                ours[key].append({"label": f"{lab(f'{group} {e}')}: the agents, broadcast requests", "group": f"{group} {e}", "points": pts})
+    body += _benchmarks(bench, "bystander", "In " + "; in ".join(kept) + "." if kept else "", {k: v for k, v in ours.items() if v} or None)
     cards.append((_card(t2, verdict, body, a2), (t2, _tag("yes" if yes else "no", label), a2)))
     return cards
 
@@ -539,7 +668,12 @@ def adoption_payload(d, order, msgs):
     p = d / "diffusion_adoptions.csv"
     if not p.exists():
         return None
-    ad = pd.read_csv(p, parse_dates=["ts"])
+    ad = pd.read_csv(p)
+    if "agent" in ad.columns:  # item, order, agent, first_use, first_use_event_id; item names masked where they looked like credentials
+        ad = ad.rename(columns={"agent": "actor", "first_use": "ts"})
+    ad["ts"] = pd.to_datetime(ad.ts)
+    if "kind" not in ad.columns:
+        ad["kind"] = ad.item.map(item_kind)
     idx = {a: i for i, a in enumerate(order)}
     ad = ad[ad.actor.isin(idx)].sort_values(["item", "ts"])
     if ad.empty:
@@ -636,23 +770,69 @@ def diffusion_card(d, ad, lr):
     return _card(title, verdict, body, anchor), (title, " ".join(chips), anchor)
 
 
+def _join(items):
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def goal_type_section(d, group, lab, drop):
+    """Response rates by the kind of goal, within era (trends_goal_type.csv), as a drawer: with `swarm-sna trends`
+    run after this version the table carries day-bootstrap intervals and, per kind, the odds that a given agent answers
+    against the era's commonest kind with group size and being addressed held fixed; the paragraph reads those off."""
+    p = d / "trends_goal_type.csv"
+    if not p.exists():
+        return ""
+    g = pd.read_csv(p)
+    g = g[~g.era.map(lambda e: f"{group} {e}").isin(drop)]
+    if g.empty:
+        return ""
+    label = lambda e: lab(f"{group} {e}")  # noqa: E731
+    title = "Response rates by the kind of goal the swarm was given"
+    if "odds_vs_main" not in g.columns:
+        t = g.assign(era=g.era.map(label)).rename(columns=lambda c: c.replace("_", " "))
+        return _drawer(title, '<p class="meaning">Plain rates, with no interval or test behind them: re-run <code>swarm-sna trends</code> for both.</p>' + _table(t, {c: ".0%" for c in t.columns if "respond" in c or "answered" in c}))
+
+    def ci(r, c):
+        return f"{r[c]:.0%} [{r[c + '_lo']:.0%}, {r[c + '_hi']:.0%}]" if pd.notna(r[c]) else ""
+
+    recs = g.to_dict("records")
+    rows = pd.DataFrame(
+        {
+            group: g.era.map(label).str.replace(" ", "\u00a0"), "kind of goal": g.goal_type, "requests": g.requests.astype(int), "agents a day": g.agents_a_day.round(0).astype(int),
+            "anyone answers": [ci(r, "answered_by_anyone") for r in recs], "a given agent answers": [ci(r, "each_agent_responds") for r in recs], "the named agent answers": [ci(r, "addressed_agent_responds") for r in recs],
+            "odds vs the commonest kind": [f"{r['odds_vs_main']:.2f} [{r['odds_lo']:.2f}, {r['odds_hi']:.2f}]" if pd.notna(r["odds_vs_main"]) else "reference" for r in recs],
+        }
+    )
+    sentences = []
+    for era, te in g.groupby("era", sort=True):
+        main = te.main.iloc[0]
+        base = te[te.goal_type == main].iloc[0]
+        others = te[(te.goal_type != main) & te.odds_vs_main.notna()]
+        if others.empty:
+            sentences.append(f"{label(era)} had one kind of goal ({main}) throughout, so the kind of goal cannot be told apart from everything else that changed with the {group}.")
+            continue
+        same = [r for r in others.itertuples() if r.odds_lo <= 1 <= r.odds_hi]
+        diff = [r for r in others.itertuples() if not (r.odds_lo <= 1 <= r.odds_hi)]
+        say = lambda r: f"{r.goal_type} goals (odds {r.odds_vs_main:.2f} [{r.odds_lo:.2f}, {r.odds_hi:.2f}], {int(r.requests):,} requests)"  # noqa: E731
+        parts = []
+        if same:
+            parts.append("no differently under " + _join([say(r) for r in same]))
+        if diff:
+            parts.append(_join([("slightly " if 0.8 < r.odds_vs_main < 1.25 else "") + ("less" if r.odds_vs_main < 1 else "more") + " often under " + say(r) for r in diff]))
+        s = f"In {label(era)}, against {main} goals ({int(base.requests):,} requests), a given agent answers " + " and ".join(parts) + ", once group size and being addressed are held fixed."
+        sized = [r for r in others.itertuples() if base.agents_a_day and abs(r.agents_a_day / base.agents_a_day - 1) > 0.25]
+        if sized:
+            s += " The plain rates in the table move with group size as much as with the goal: " + _join([f"{r.goal_type} days had {r.agents_a_day:.0f} agents a day" for r in sized]) + f" against {base.agents_a_day:.0f} under {main} goals."
+        sentences.append(s)
+    note = '<p class="meaning">Rates with 95% intervals from resampling days within each kind of goal. The last column is the odds that a given agent answers under that kind of goal against the era\'s commonest kind, from a logistic model with group size (log) and being addressed by name held fixed.</p>'
+    return _drawer(title, f'<p class="meaning">{" ".join(sentences)}</p>' + _table(rows) + note)
+
+
 def time_card(d, has_timeline, group, lab, drop):
     title, anchor = "The network over time", "time"
-    body = ""
-    if has_timeline:
-        body += "<h3>Who mentions whom, week by week</h3>" + _fig("timeline")
-    if (d / "trends_weekly.csv").exists():
-        w = pd.read_csv(d / "trends_weekly.csv")
-        w = w[~w.era.map(lambda e: f"{group} {e}" if pd.notna(e) else "").isin(drop)]
-        body += "<h3>The weekly series behind the pooled numbers</h3>" + _fig("trends")
-        body += _drawer("The weekly series as a table", _table(w.assign(era=w.era.map(lambda e: lab(f"{group} {int(e)}") if pd.notna(e) else "")).rename(columns=lambda c: c.replace("_", " ")), {c.replace("_", " "): ".0%" for c in ("answered", "each_agent_responds", "compliance", "backed")} | {"requests per 100": ".1f"}))
-    if not body:
-        return _missing(title, "swarm-sna report, then trends", anchor)
-    body = '<p class="meaning">Every agent is assigned a place on the circle in the order of joining, so a tie across the circle is a tie between an old agent and a new one. The network is built from mentions: an agent naming another in a message, with @ or by name; the second button switches to who answers whose requests. The slider moves through the weeks, and hollow dots are agents not active in the window. Below, the weekly rates behind every pooled number: a pooled statistic over a long transcript mixes regimes, and the series show whether a result is a property of the swarm or of one period.</p>' + body
-    if (d / "trends_goal_type.csv").exists():
-        g = pd.read_csv(d / "trends_goal_type.csv")
-        g = g[~g.era.map(lambda e: f"{group} {e}").isin(drop)].assign(era=lambda x: x.era.map(lambda e: lab(f"{group} {e}"))).rename(columns=lambda c: c.replace("_", " "))
-        body += _drawer("Response rates by the kind of goal the swarm was given", _table(g, {c: ".0%" for c in g.columns if "respond" in c or "answered" in c}))
+    if not has_timeline:
+        return _missing(title, "swarm-sna extract", anchor)
+    body = '<p class="meaning">Every agent is assigned a place on the circle in the order of joining, so a tie across the circle is a tie between an old agent and a new one. The network is built from mentions: an agent naming another in a message, with @ or by name; the second button switches to who answers whose requests. The slider moves through the weeks, and hollow dots are agents not active in the window.</p>'
+    body += "<h3>Who mentions whom, week by week</h3>" + _fig("timeline") + goal_type_section(d, group, lab, drop)
     return _card(title, "", body, anchor), (title, _tag("info", "start here"), anchor)
 
 
@@ -701,7 +881,7 @@ def payload(d, group, groups, msgs, events, agents, mentions, req, resp, drop, n
             family_order.append(f)
     out = {
         "group_label": group, "groups": groups, "default_null": null, "palette": PALETTE, "family_order": family_order, "families": dict(zip(agents.agent, agents.family)),
-        "nulls": None, "networks": {}, "timeline": None, "helping": None, "hierarchy": None, "trends": None, "diffusion": None,
+        "nulls": None, "networks": {}, "timeline": None, "helping": None, "hierarchy": None, "diffusion": None, "bench": {},
     }
     rep = d / f"report_{group}.csv"
     if rep.exists():
@@ -711,8 +891,8 @@ def payload(d, group, groups, msgs, events, agents, mentions, req, resp, drop, n
         draws = json.loads(draws_path.read_text()) if draws_path.exists() else None
         if draws:
             draws = {n: {s: {g: v for g, v in by_g.items() if g not in drop} for s, by_g in by_s.items()} for n, by_s in draws.items()}
-        draws = {null: draws[null]} if draws and null in draws else None  # only the default shuffle is drawn; each verdict says whether the other agrees
-        out["nulls"] = {"table": _records(t[t.null == null]), "stats": [{"key": k, "label": STAT_LABELS[k]} for k in [s for s, _, _ in NETWORK_CARDS]], "null_names": {null: NULL_NAMES[null]}, "draws": draws}
+        present = [k for k in NULL_NAMES if k in set(t.null)]
+        out["nulls"] = {"table": _records(t[t.null.isin(present)]), "stats": [{"key": k, "label": STAT_LABELS[k]} for k in [s for s, _, _ in NETWORK_CARDS]], "null_names": {k: NULL_NAMES[k] for k in present}, "draws": draws}
     order = agents.sort_values("joined").agent.tolist()
     order += sorted(set(msgs.actor) - set(order))
     if mentions is not None:
@@ -727,10 +907,6 @@ def payload(d, group, groups, msgs, events, agents, mentions, req, resp, drop, n
         h = pd.read_csv(d / f"hierarchy_{group}.csv")
         r = pd.read_csv(d / f"hierarchy_ranks_{group}.csv") if (d / f"hierarchy_ranks_{group}.csv").exists() else pd.DataFrame(columns=["group"])
         out["hierarchy"] = {"table": _records(h[~h.group.isin(drop)]), "ranks": _records(r[~r.group.isin(drop)])}
-    if (d / "trends_weekly.csv").exists():
-        w = pd.read_csv(d / "trends_weekly.csv")
-        w = w[~w.era.map(lambda e: f"{group} {e}" if pd.notna(e) else "").isin(drop)]
-        out["trends"] = {"weekly": _records(w), "series": [list(s) for s in TREND_SERIES], "era_starts": {str(_clean(e)): wk for e, wk in w.dropna(subset=["era"]).groupby("era").week.min().items()}}
     if (d / "diffusion_items.csv").exists():
         sm = _csv(d / "diffusion_summary.csv")
         out["diffusion"] = {
@@ -779,11 +955,13 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
             n_perm = int(rep.permutations.iloc[0])
     data = payload(d, group, groups, amsgs, ev, agents, mentions, req, resp, drop, null)
     bench = load_benchmarks(meta)
-    cards = [time_card(d, data["timeline"] is not None, group, lab, drop)] + network_cards(d, group, lab, drop, thin_set, null, n_perm, bench) + [hierarchy_card(d, group, lab, drop, thin_set, bench)]
+    cards = [time_card(d, data["timeline"] is not None, group, lab, drop)] + network_cards(d, group, lab, drop, thin_set, null, n_perm, bench, data["networks"]) + [hierarchy_card(d, group, lab, drop, thin_set, bench)]
     und = data["helping"]["undirected"] if data["helping"] else None
     ad, lr = (data["diffusion"]["adoptions"], data["diffusion"]["lead_rank"]) if data["diffusion"] else (None, None)
     cards += helping_cards(d, group, lab, drop, bench, und) + [evidence_card(d), diffusion_card(d, ad, lr), quality_card(d, validation)]
     cards = [c for c in cards if c]
+    if bench:
+        data["bench"] = bench.payload  # filled while the cards were built
     glance = "".join(f'<li><a href="#{a}">{esc(t)}</a><span class="chips">{chips}</span></li>' for _, (t, chips, a) in cards[1:])
     intro_html = intro_card(intro, groups, msgs, group)
     subtitle = f"{esc(title or d.name)} &middot; {esc(str(msgs.day.min()))} to {esc(str(msgs.day.max()))}"

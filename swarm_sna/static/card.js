@@ -22,6 +22,7 @@
     tip.style("display", "block").selectAll("*").remove();
     if (title) tip.append("div").attr("class", "tip-title").text(title);
     (rows || []).forEach(([label, value, colour]) => {
+      if (value === undefined) { tip.append("div").attr("class", "tip-text").text(label); return; }
       const r = tip.append("div").attr("class", "tip-row");
       if (colour) r.append("span").attr("class", "key").style("background", colour);
       r.append("b").text(value);
@@ -73,7 +74,7 @@
     const kind = el._null || (kinds.includes(D.default_null) ? D.default_null : kinds[0]);
     if (kinds.length > 1) {
       const ctl = d3.select(el).append("div").attr("class", "ctl");
-      ctl.append("span").attr("class", "ctl-label").text("null");
+      ctl.append("span").attr("class", "ctl-label").text("shuffle");
       ctl.selectAll("button").data(kinds).join("button").attr("class", k => "seg" + (k === kind ? " on" : "")).text(k => N.null_names[k])
         .on("click", (e, k) => { el._null = k; el.replaceChildren(); nulls(el); });
     }
@@ -385,43 +386,6 @@
     note(el, "Normalised David's score, top ten per group.");
   }
 
-  // ---- the weekly series, stacked on one time axis, with a crosshair
-  function trends(el) {
-    const Tr = D.trends; if (!Tr || !Tr.weekly.length) return;
-    const weeks = Tr.weekly.map(r => new Date(r.week)), W = width(el), left = 46, ph = 84, h = ph * Tr.series.length + 24;
-    const svg = svgIn(el, W, h);
-    const x = d3.scaleTime().domain(d3.extent(weeks)).range([left, W - 14]);
-    const panels = Tr.series.map(([col, label], i) => {
-      const vals = Tr.weekly.map(r => r[col]), rate = d3.max(vals.filter(v => v != null)) <= 1;
-      const y = d3.scaleLinear().domain([0, rate ? 1 : (d3.max(vals) || 1)]).range([i * ph + ph - 14, i * ph + 26]);
-      const g = svg.append("g");
-      grid(g.append("g").attr("transform", `translate(${left},0)`), y, 2, W - left - 14, true);
-      g.append("text").attr("x", left + 4).attr("y", i * ph + 12).attr("font-size", 11).attr("font-weight", 600).attr("fill", P.ink).text(label);
-      g.append("g").attr("transform", `translate(${left},0)`).call(d3.axisLeft(y).ticks(2).tickSize(3).tickFormat(rate ? pct : d3.format("~s"))).call(axis);
-      g.append("path").datum(Tr.weekly.filter(r => r[col] != null)).attr("fill", "none").attr("stroke", P.series[0]).attr("stroke-width", 2).attr("stroke-linejoin", "round")
-        .attr("d", d3.line().defined(r => r[col] != null).x(r => x(new Date(r.week))).y(r => y(r[col])));
-      return { col, label, y, rate };
-    });
-    Object.entries(Tr.era_starts).forEach(([era, start]) => {
-      const xs = x(new Date(start));
-      if (xs <= left + 1) return;  // the first group starts at the axis; a label there would sit on the panel title
-      svg.append("line").attr("x1", xs).attr("x2", xs).attr("y1", 2).attr("y2", h - 24).attr("stroke", P.observed).attr("stroke-opacity", 0.6);
-      svg.append("text").attr("x", xs + 4).attr("y", h - 28).attr("font-size", 10).attr("fill", P.observed).text(glabel(`${D.group_label} ${era}`));
-    });
-    svg.append("g").attr("transform", `translate(0,${h - 24})`).call(d3.axisBottom(x).ticks(Math.min(8, Math.floor(W / 110))).tickSize(3)).call(axis);
-    const cross = svg.append("line").attr("y1", 2).attr("y2", h - 24).attr("stroke", P.muted).attr("stroke-width", 1).style("display", "none");
-    const dots = svg.append("g").selectAll("circle").data(panels).join("circle").attr("r", 4).attr("fill", P.series[0]).attr("stroke", "#fff").attr("stroke-width", 2).style("display", "none");
-    const bisect = d3.bisector(d => d).center;
-    svg.append("rect").attr("x", left).attr("y", 0).attr("width", W - left - 14).attr("height", h - 24).attr("fill", "transparent")
-      .on("pointermove", e => {
-        const [mx] = d3.pointer(e); const k = bisect(weeks, x.invert(mx)); const r = Tr.weekly[k]; const xs = x(weeks[k]);
-        cross.style("display", null).attr("x1", xs).attr("x2", xs);
-        dots.style("display", p => r[p.col] == null ? "none" : null).attr("cx", xs).attr("cy", p => r[p.col] == null ? 0 : p.y(r[p.col]));
-        showTip(e, "week of " + r.week + (r.era != null ? ` · ${glabel(`${D.group_label} ${r.era}`)}` : ""), panels.map(p => [p.label, r[p.col] == null ? "n/a" : p.rate ? pct(r[p.col]) : d3.format(".2~f")(r[p.col])]).concat([["messages", int(r.messages)]]));
-      })
-      .on("pointerleave", () => { cross.style("display", "none"); dots.style("display", "none"); hideTip(); });
-  }
-
   // ---- diffusion: z per item, and the inferred network of who adopts after whom
   function diffusion_items(el) {
     const Df = D.diffusion; if (!Df || !Df.items.length) return;
@@ -631,8 +595,92 @@
     familyLegend(el);
   }
 
+  // ---- the agents' statistic beside the published animal and human values, on one scale
+  const SYMBOLS = { "▲": d3.symbolTriangle, "■": d3.symbolSquare, "●": d3.symbolCircle, "◆": d3.symbolDiamond, "★": d3.symbolStar, "✚": d3.symbolCross, "⬟": d3.symbolWye };
+  const symbolOf = group => { const g = G.get(group); return d3.symbol().type(g && SYMBOLS[g.marker] ? SYMBOLS[g.marker] : d3.symbolCircle); };  // an era's marker is its point shape
+  const whoLabel = r => r.ours ? "the agents" : r.who === "animal" ? "animals" : "people";
+  const whoColour = r => r.ours ? P.observed : r.who === "animal" ? P.series[2] : P.series[0];
+  function benchRows(B) {  // one panel per statistic: the agents' rows (filtered by the era buttons) first, then the published ones
+    const shown = new Set(groupsShown());
+    return B.panels.map(p => ({ key: p.key, label: p.label, rows: (B.ours[p.key] || []).filter(r => !r.group || shown.has(r.group)).map(r => Object.assign({ ours: true }, r)).concat(B.rows.filter(r => r.stat === p.key)) })).filter(p => p.rows.length);
+  }
+  function benchTip(e, r, fmt) {
+    if (r.ours) showTip(e, r.label, r.points.map(q => [q.label || "observed", fmt(q.v), P.observed]).concat(r.null != null ? [["null mean", fmt(r.null), P.null]] : []));
+    else showTip(e, r.label, [[r.measure], ["reported as " + r.value], [r.source]]);
+  }
+  function bench(el) {
+    const B = D.bench && D.bench[el.dataset.card]; if (!B) return;
+    const panels = benchRows(B); if (!panels.length) return;
+    const fmt = B.format === "pct" ? pct : f2;
+    if (B.layout === "curves") { benchCurves(el, panels); return; }
+    const pairs = B.layout === "pairs";
+    const W = width(el), left = Math.min(300, Math.max(150, Math.round(W * 0.34))), rh = pairs ? 36 : 22, head = 26, gapP = 34;
+    const H = d3.sum(panels, p => head + p.rows.length * rh + gapP) + 2;
+    const svg = svgIn(el, W, H);
+    const vmax = d3.max(panels, p => d3.max(p.rows, r => d3.max(r.points, q => q.hi != null ? q.hi : q.v))) || 1;
+    const x = d3.scaleLinear().domain([0, Math.max(1, vmax * 1.05)]).range([left, W - 16]);
+    const chars = Math.floor((left - 12) / 6), trunc = t => t.length > chars ? t.slice(0, chars - 1) + "…" : t;
+    let y0 = 2;
+    panels.forEach(p => {
+      svg.append("text").attr("x", 0).attr("y", y0 + 13).attr("font-size", 12).attr("font-weight", 600).attr("fill", P.ink).text(p.label);
+      const top = y0 + head, bottom = top + p.rows.length * rh;
+      grid(svg.append("g").attr("transform", `translate(0,${top - 2})`), x, 5, bottom - top + 2, false);
+      p.rows.forEach((r, i) => {
+        const cy = top + i * rh + rh / 2, colour = whoColour(r), g = svg.append("g");
+        const lines = pairs && r.points.length === 2 && r.points[0].label ? [r.label, r.points[0].label + " → " + r.points[1].label] : [r.label];
+        lines.forEach((line, k) => g.append("text").attr("x", left - 10).attr("y", cy + (lines.length === 2 ? (k ? 7 : -6) : 0)).attr("text-anchor", "end").attr("dominant-baseline", "middle")
+          .attr("font-size", k ? 10 : 11).attr("fill", r.ours && !k ? P.ink : P.muted).attr("font-weight", r.ours && !k ? 600 : 400).text(trunc(line)));
+        if (r.ours && r.null != null) {
+          g.append("line").attr("x1", x(r.null)).attr("x2", x(r.points[0].v)).attr("y1", cy).attr("y2", cy).attr("stroke", P.null).attr("stroke-width", 2);
+          g.append("circle").attr("cx", x(r.null)).attr("cy", cy).attr("r", 4).attr("fill", "#fff").attr("stroke", P.muted).attr("stroke-width", 1.5);
+        }
+        r.points.forEach((q, k) => {
+          if (q.hi != null) { g.append("line").attr("x1", x(q.lo)).attr("x2", x(q.hi)).attr("y1", cy).attr("y2", cy).attr("stroke", colour).attr("stroke-opacity", 0.45).attr("stroke-width", 7).attr("stroke-linecap", "round"); return; }
+          if (pairs && k === 1) g.append("line").attr("x1", x(r.points[0].v)).attr("x2", x(q.v)).attr("y1", cy).attr("y2", cy).attr("stroke", colour).attr("stroke-width", 1.5);
+          const hollow = pairs && k === 0, sym = r.ours ? symbolOf(r.group) : d3.symbol().type(d3.symbolCircle);
+          g.append("path").attr("d", sym.size(r.ours ? 72 : 46)()).attr("transform", `translate(${x(q.v)},${cy})`).attr("fill", hollow ? "#fff" : colour).attr("stroke", hollow ? colour : "#fff").attr("stroke-width", 1.5);
+        });
+        g.append("rect").attr("x", 0).attr("y", cy - rh / 2).attr("width", W).attr("height", rh).attr("fill", "transparent").on("pointermove", e => benchTip(e, r, fmt)).on("pointerleave", hideTip);
+      });
+      svg.append("g").attr("transform", `translate(0,${bottom + 2})`).call(d3.axisBottom(x).ticks(5).tickSize(3).tickFormat(fmt)).call(axis);
+      y0 = bottom + gapP;
+    });
+    const who = Array.from(new Set(panels.flatMap(p => p.rows.map(whoLabel))));
+    legend(el, who.map(w => [w, w === "the agents" ? P.observed : w === "animals" ? P.series[2] : P.series[0]]).concat(panels.some(p => p.rows.some(r => r.ours && r.null != null)) ? [["where the shuffle puts the agents", P.null]] : []));
+  }
+
+  // rates against group size: the agents per era, and each study on the axis it used
+  function benchCurves(el, panels) {
+    const W = width(el), two = W >= 640 && panels.length > 1, pw = two ? W / panels.length : W, ph = 270, left = 44;
+    const svg = svgIn(el, W, two ? ph : ph * panels.length);
+    const xmax = d3.max(panels, p => d3.max(p.rows, r => d3.max(r.points, q => q.x))) || 10;
+    const x = d3.scaleLog().domain([1, Math.max(10, xmax * 1.3)]).range([left, pw - 16]);
+    const y = d3.scaleLinear().domain([0, 1]).range([ph - 44, 30]);
+    const others = [P.series[0], P.series[2], P.ink, P.muted, P.series[1]];
+    const items = [];
+    panels.forEach((p, k) => {
+      const g = svg.append("g").attr("transform", two ? `translate(${k * pw},0)` : `translate(0,${k * ph})`);
+      g.append("text").attr("x", 8).attr("y", 14).attr("font-size", 12).attr("font-weight", 600).attr("fill", P.ink).text(p.label);
+      grid(g.append("g").attr("transform", `translate(${left},0)`), y, 4, pw - left - 16, true);
+      g.append("g").attr("transform", `translate(${left},0)`).call(d3.axisLeft(y).ticks(4).tickSize(3).tickFormat(pct)).call(axis);
+      g.append("g").attr("transform", `translate(0,${ph - 44})`).call(d3.axisBottom(x).tickValues([1, 2, 3, 5, 10, 20, 50].filter(v => v <= x.domain()[1])).tickFormat(d3.format("d")).tickSize(3)).call(axis);
+      g.append("text").attr("x", pw - 16).attr("y", ph - 10).attr("text-anchor", "end").attr("font-size", 10.5).attr("fill", P.muted).text("able to answer, as each study counts them (log scale)");
+      let o = 0;
+      p.rows.forEach(r => {
+        const colour = r.ours ? P.observed : others[o++ % others.length], pts = r.points.slice().sort((a, b) => a.x - b.x);
+        g.append("path").datum(pts).attr("fill", "none").attr("stroke", colour).attr("stroke-width", r.ours ? 2.2 : 1.6).attr("stroke-dasharray", r.ours ? null : "4 3").attr("stroke-linejoin", "round").attr("d", d3.line().x(q => x(q.x)).y(q => y(q.v)));
+        const sym = r.ours ? symbolOf(r.group) : d3.symbol().type(d3.symbolCircle);
+        pts.forEach(q => g.append("path").attr("d", sym.size(r.ours ? 64 : 40)()).attr("transform", `translate(${x(q.x)},${y(q.v)})`).attr("fill", colour).attr("stroke", "#fff").attr("stroke-width", 1.5));
+        pts.forEach(q => g.append("circle").attr("cx", x(q.x)).attr("cy", y(q.v)).attr("r", 9).attr("fill", "transparent")
+          .on("pointermove", e => showTip(e, r.label, [[q.label || (q.x + " able to answer"), pct(q.v), colour]].concat(r.ours ? [] : [[r.source]]))).on("pointerleave", hideTip));
+        if (!items.some(it => it[0] === r.label)) items.push([r.label, colour]);
+      });
+    });
+    legend(el, items, true);
+  }
+
   // ---- wiring
-  const RENDER = { nulls, network, timeline, ladder, bystander, hierarchy, ranks, trends, diffusion_items, diffusion_network, leaders, help_rates, diffusion_patterns, diffusion_run, lead_vs_rank };
+  const RENDER = { nulls, network, timeline, ladder, bystander, hierarchy, ranks, bench, diffusion_items, diffusion_network, leaders, help_rates, diffusion_patterns, diffusion_run, lead_vs_rank };
   function renderAll(groupedOnly) {
     document.querySelectorAll(".fig").forEach(el => {
       if (groupedOnly && !el.dataset.groups) return;

@@ -69,4 +69,5 @@ footer { color:var(--muted); font-size:12.5px; padding-bottom:40px; }
 .tip .tip-row { display:flex; gap:8px; align-items:baseline; white-space:nowrap; }
 .tip .tip-row b { font-variant-numeric: tabular-nums; min-width:3.5em; }
 .tip .tip-row span { color:var(--muted); }
+.tip .tip-text { white-space: normal; color:var(--muted); margin-top:3px; }
 .tip .key { display:inline-block; width:10px; height:3px; border-radius:2px; min-width:10px; }

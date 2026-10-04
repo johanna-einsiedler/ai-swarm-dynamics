@@ -203,7 +203,9 @@ HOST = re.compile(r"^[a-z0-9.\-]+\.[a-z]{2,}(?:/|$)")
 
 
 def item_kind(item):
-    """link (a host, maybe with a path), file (a name with an extension) or term (a backticked token)."""
+    """link (a host, maybe with a path), file (a name with an extension) or term (a backticked token).
+    A masked name carries a '#hash' suffix (redact.label); it is ignored here."""
+    item = re.sub(r"#[0-9a-f]{6}$", "", str(item))
     return "file" if FILE_EXT.search(item) else "link" if HOST.match(item) else "term"
 
 
@@ -228,9 +230,6 @@ def run(in_dir, n_perm=N_PERM, seed=0):
     print(f"{len(fu):,} first uses of {fu.item.nunique():,} tokens; {len(items)} items with {MIN_ADOPTERS}-{MAX_ADOPTERS} adopters spread over {MIN_SPREAD_DAYS}-{MAX_SPREAD_DAYS} days")
     if items.empty:
         return _nothing(in_dir, "no token spread to enough agents to test")
-    # Every adoption of every selected item, in order: the card replays them and reads the general patterns off them.
-    ad = fu[fu.item.isin(items.index)].sort_values(["item", "ts"])
-    ad.assign(kind=ad.item.map(item_kind)).to_csv(in_dir / "diffusion_adoptions.csv", index=False)
     rng = np.random.default_rng(seed)
     rows = []
     for item, meta in items.iterrows():

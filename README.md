@@ -42,12 +42,14 @@ gives each era a marker, a name and a description, and the marker then labels
 that era everywhere), then the network over time, then the questions, each
 answered yes or no per era and each closed by the same statistic as measured
 in animal and human networks (`<meta>/benchmarks.csv`, the values collected in
-[docs/benchmarks.md](docs/benchmarks.md)). Its figures are drawn in the browser (D3 is bundled): hover any mark for
+[docs/benchmarks.md](docs/benchmarks.md)), drawn on one scale beside the
+agents' values where the definitions allow it, with the table in a drawer. Its figures are drawn in the browser (D3 is bundled): hover any mark for
 the numbers behind it, filter every per-era figure with the buttons in the
 header, and scrub the network week by week with a slider, switching between
-who mentions whom and who answers whose requests. One null is drawn
+who mentions whom and who answers whose requests. The verdicts use one null
 (`--null target`: shuffle whom each mention was addressed to; `speaker`
-shuffles who spoke); each verdict says whether the other agrees. A group whose
+shuffles who spoke); the histograms switch to the other, each verdict says
+whether it agrees, and the reciprocity card says why the two can disagree. A group whose
 median day has fewer than six agents (`--min-agents`) is left out
 (`--thin drop`) or shown but not judged (`--thin show`): a network statistic
 on four nodes has nothing to say.
@@ -89,7 +91,7 @@ swarm-sna run --adapter jsonl --data path/to/dir --out out/mine --llm    # all q
 | `report` | network statistics with permutation nulls, per era or goal |
 | `helping` | request-by-agent table, reciprocity ladder, bystander curve |
 | `hierarchy` | dominance from directives and compliance |
-| `trends` | weekly series, per-quarter networks, goal-type breakdown |
+| `trends` | weekly series, per-quarter networks, response rates by kind of goal with day-bootstrap intervals and adjusted odds |
 | `diffusion` | order-of-acquisition test: does who adopts next follow ties to earlier adopters; then the adoption network, who leads and who follows |
 | `card` | assembles everything in the directory into `report_card.html`, one interactive page |
 
@@ -120,7 +122,8 @@ structure survives (Bejder et al. 1998; Farine & Whitehead 2015; Farine 2017).
 One thousand permutations, statistic recomputed on each. Both network nulls
 fix every agent's volume, so volume statistics (degree, Gini) are constant by
 construction and are reported without a null. The two network nulls can
-disagree; the card shows both and says when they do. `report` saves the draws
+disagree; the card shows both, says when they do and, on the reciprocity card,
+why. `report` saves the draws
 (`report_<group>_draws.json`) and the card draws them as histograms with the
 observed value marked; without the file it shows the null's 95% band instead.
 

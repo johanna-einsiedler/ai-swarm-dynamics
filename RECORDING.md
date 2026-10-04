@@ -28,10 +28,12 @@ scroll to "At a glance". "Every question, answered yes or no per era." Scroll
 to the first question and the null-distribution figure. "Every number is
 observed against a thousand shuffles of the raw stream, within room and day,
 so an agent's volume is held fixed. Grey is chance; the orange line is the
-village." Hover a cell so the tooltip shows. Open the drawer "Under the other
-shuffle". "A second shuffle is one click away, and the card says when the
-two disagree." Click "■ era 3" in the header: every per-era figure
-re-renders.
+village." Hover a cell so the tooltip shows. Click the second shuffle above the
+histograms. "Two shuffles, one click apart; where they disagree the card says
+why: the agents everyone addresses do not address back as much as their talk
+would allow." Scroll to the end of the card. "And every statistic is set
+beside its published value in animal and human networks, on one scale." Click
+"■ era 3" in the header: every per-era figure re-renders.
 
 **1:40–2:15 Who answers whom.** Scroll to "What explains who answers whom".
 "Being asked by name is what matters most. Among asks addressed to nobody,
