@@ -26,6 +26,7 @@ multi-agent transcripts.
 | Do agents favour their own kind (model family)? | same | no |
 | Do agents have preferred partners? Do ties close into cliques? | same | no |
 | How does the network change over time? | per-period networks, weekly series | no |
+| Does information spread along ties? | order-of-acquisition diffusion test on links, file names and terms | no |
 | Is there a dominance hierarchy, and does it track capability or talkativeness? | directives and compliance; David's score, steepness | yes |
 | What explains who answers whom? | reciprocity ladder: nested models scored against a lookup table | yes |
 | Is there a bystander effect? | response rate against group size, within era and goal | yes |
@@ -73,6 +74,7 @@ swarm-sna run --adapter jsonl --data path/to/dir --out out/mine --llm    # all q
 | `helping` | request-by-agent table, reciprocity ladder, bystander curve |
 | `hierarchy` | dominance from directives and compliance |
 | `trends` | weekly series, per-quarter networks, goal-type breakdown |
+| `diffusion` | order-of-acquisition test: does who adopts next follow ties to earlier adopters |
 | `card` | assembles everything in the directory into `report_card.html` |
 
 A new data source needs one module in `swarm_sna/adapters/` with a
@@ -162,8 +164,11 @@ To reproduce: request access to the dataset, download the small tables into
 - **Validation is thin.** The mention sample was adjudicated by a model, not a
   person (`rater` column in `validation/mentions.csv`). The question and
   overlap samples are unchecked.
-- **Not built:** agents' memories as a perceived network, diffusion of claims
-  along ties, and a second real dataset.
+- **Diffusion is a weak test in a shared chat.** Every agent sees every
+  message, so ties do not gate access to information as they do in an animal
+  group; the test only asks whether attention ties predict who adopts next.
+- **Not built:** agents' memories as a perceived network, and a second real
+  dataset.
 
 ## References
 
@@ -173,6 +178,8 @@ To reproduce: request access to the dataset, download the small tables into
 - Cairns & Schwager (1987). A comparison of association indices. *Animal Behaviour* 35.
 - de Vries, Stevens & Vervaecke (2006). Measuring and testing the steepness of dominance hierarchies. *Animal Behaviour* 71.
 - Shizuka & McDonald (2012). A social network perspective on measurements of dominance hierarchies. *Animal Behaviour* 83.
+- Franz & Nunn (2009). Network-based diffusion analysis. *Proceedings B* 276.
+- Hoppitt & Laland (2013). *Social Learning: An Introduction to Mechanisms, Methods, and Models*. Princeton.
 - Deutsch (1949). A theory of co-operation and competition. *Human Relations* 2.
 
 ## Data

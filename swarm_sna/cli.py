@@ -105,11 +105,18 @@ def cmd_run(args):
         cmd_label(argparse.Namespace(dir=args.out, cache=cache, workers=args.workers, limit=0, named_sample=0, broadcast_sample=0, requests_only=False, screen="base", seed=args.seed))
         cmd_verify(argparse.Namespace(dir=args.out, cache=cache, model="sonnet", workers=args.workers))
     cmd_report(argparse.Namespace(dir=args.out, permutations=args.permutations, by="era", mention_kinds="at,name", seed=args.seed))
+    cmd_diffusion(argparse.Namespace(dir=args.out, permutations=args.permutations, seed=args.seed))
     if list(out.glob("responses*.parquet")):
         cmd_helping(argparse.Namespace(dir=args.out, bootstraps=300, seed=args.seed))
         cmd_hierarchy(argparse.Namespace(dir=args.out, by="era", meta=args.meta, permutations=args.permutations, seed=args.seed))
         cmd_trends(argparse.Namespace(dir=args.out, meta=args.meta))
     cmd_card(argparse.Namespace(dir=args.out, title=args.title, by="era", validation="validation"))
+
+
+def cmd_diffusion(args):
+    from . import diffusion
+
+    diffusion.run(args.dir, n_perm=args.permutations, seed=args.seed)
 
 
 def cmd_report(args):
@@ -192,6 +199,12 @@ def main():
     a.add_argument("--title", default=None)
     a.add_argument("--seed", type=int, default=0)
     a.set_defaults(func=cmd_run)
+
+    df = sub.add_parser("diffusion", help="does information (tokens, links, file names) spread along ties? order-of-acquisition test")
+    df.add_argument("dir", nargs="?", default="out/village")
+    df.add_argument("--permutations", type=int, default=1000)
+    df.add_argument("--seed", type=int, default=0)
+    df.set_defaults(func=cmd_diffusion)
 
     r = sub.add_parser("report", help="network statistics, each with permutation nulls")
     r.add_argument("dir", nargs="?", default="out/village", help="directory written by extract")

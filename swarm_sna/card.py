@@ -34,6 +34,7 @@ LADDER_NOTE = {
 FEATURE_NAMES = {"addressed": "addressed by name", "prior_help": "asker answered you before", "reputation": "asker answers others", "busy": "responder busy", "log_active_n": "agents present (log)"}
 
 esc = html.escape
+MIN_AD = 4
 
 
 def _p(p):
@@ -251,6 +252,26 @@ def evidence_card(d):
     return _card(title, verdict, body, anchor), (title, _tag("info", f"{share:.0%} backed"), anchor)
 
 
+def diffusion_card(d):
+    title, anchor = "Does information spread along ties?", "diffusion"
+    path = d / "diffusion_items.csv"
+    if not path.exists():
+        return _missing(title, "swarm-sna diffusion", anchor)
+    t = pd.read_csv(path)
+    z = t.z.dropna()
+    share = (t.p < 0.05).mean()
+    stouffer = z.mean() * np.sqrt(len(z)) if len(z) else np.nan
+    o = "above" if stouffer > 1.96 else "within"
+    label = "adoption follows ties" if o == "above" else "no more than chance"
+    verdict = _tag(o, label) + f" {len(t)} items (links, file names, backticked terms) that spread to {MIN_AD}+ agents. In {share:.1%} of them the order of adoption leans on prior ties more than random orders do (5% expected by chance); combined z = {stouffer:+.1f}."
+    body = '<p class="meaning">Order-of-acquisition diffusion analysis (Franz &amp; Nunn 2009; Hoppitt &amp; Laland 2013). For each item, agents are ordered by first use, and the statistic is the tie weight each adopter had to earlier adopters; the null permutes the order among the same agents. Ties are mentions in the month before the item first appeared.</p>'
+    body += _img(d / "fig_diffusion.png")
+    body += '<p class="meaning">Read with care in a shared chat room: every agent sees every message, so access to an item is not gated by ties the way it is in an animal group. The test asks whether attention ties predict who picks something up next, not whether they were needed to hear of it.</p>'
+    top = t.nsmallest(8, "p")[["item", "adopters", "first_adopter", "spread_days", "z", "p"]].rename(columns={"spread_days": "days to spread", "first_adopter": "first adopter"})
+    body += _drawer("The eight items whose spread leans most on ties", _table(top, {"days to spread": ".0f", "z": "+.2f", "p": ".3f"}))
+    return _card(title, verdict, body, anchor), (title, _tag(o, label), anchor)
+
+
 def trends_card(d, group):
     title, anchor = "How does the network change over time?", "time"
     figs = _img(d / f"network_{group}.png", "The mention network per group; strongest ties only.")
@@ -354,7 +375,7 @@ def run(in_dir, title=None, group="era", validation="validation"):
         rep = pd.read_csv(d / f"report_{group}.csv")
         if "permutations" in rep.columns:
             n_perm = int(rep.permutations.iloc[0])
-    cards = network_cards(d, group) + [hierarchy_card(d, group)] + helping_cards(d) + [evidence_card(d), trends_card(d, group), quality_card(d, validation)]
+    cards = network_cards(d, group) + [hierarchy_card(d, group)] + helping_cards(d) + [evidence_card(d), diffusion_card(d), trends_card(d, group), quality_card(d, validation)]
     cards = [c for c in cards if c]
     glance = "".join(f'<li><a href="#{a}">{esc(t)}</a><span class="chips">{chips}</span></li>' for _, (t, chips, a) in cards)
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

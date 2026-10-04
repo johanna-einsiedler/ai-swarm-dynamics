@@ -6,8 +6,9 @@ set -e
 .venv/bin/swarm-sna helping out/village --bootstraps 300
 .venv/bin/swarm-sna hierarchy out/village --by era --permutations 1000
 .venv/bin/swarm-sna trends out/village
+.venv/bin/swarm-sna diffusion out/village --permutations 1000
 .venv/bin/swarm-sna card out/village --title "AI Village"
 mkdir -p examples/village-results
-cp out/village/report_card.html out/village/*.png out/village/report_era.csv out/village/helping_*.csv out/village/hierarchy_*.csv out/village/trends_*.csv out/village/goal_alignment*.csv out/village/association_hwi.csv examples/village-results/
+cp out/village/report_card.html out/village/*.png out/village/report_era.csv out/village/helping_*.csv out/village/hierarchy_*.csv out/village/trends_*.csv out/village/goal_alignment*.csv out/village/diffusion_*.csv out/village/association_hwi.csv examples/village-results/
 cp out/toy/report_card.html examples/toy/report_card.html
 ls -la examples/village-results | awk '{print $5, $9}'

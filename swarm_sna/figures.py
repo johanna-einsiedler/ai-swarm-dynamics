@@ -214,3 +214,21 @@ def network_timeline(edges, agents, path, title, freq="Q", top_edges=70, ncols=3
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     fig.savefig(path, dpi=150)
     plt.close(fig)
+
+
+def diffusion(items, path):
+    """Each item's z: how far its adoption order leans on ties, against random orders."""
+    z = items.z.dropna()
+    fig, ax = plt.subplots(figsize=(6.4, 3.4))
+    lo, hi = min(-3, z.min() - 0.5), max(3, z.max() + 0.5)
+    ax.hist(z, bins=np.linspace(lo, hi, 36), color=NULL_FILL, edgecolor="white", linewidth=0.5)
+    ax.axvline(0, color=MUTED, linewidth=1)
+    ax.axvline(1.645, color=OBSERVED, linewidth=1.2, linestyle=(0, (3, 3)))
+    ax.annotate("p < 0.05", (1.645, 0.95), xycoords=("data", "axes fraction"), fontsize=8, color=OBSERVED, xytext=(4, 0), textcoords="offset points")
+    ax.set_xlabel("z of the observed adoption order against random orders (ties measured in the prior month)", fontsize=8.5, color=MUTED)
+    ax.set_ylabel("items", fontsize=9, color=INK)
+    ax.set_title(f"Does adoption follow ties? {len(z)} items; {(items.p < 0.05).mean():.0%} significant at 5%", fontsize=10, color=INK, loc="left")
+    _clean(ax)
+    fig.tight_layout()
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
