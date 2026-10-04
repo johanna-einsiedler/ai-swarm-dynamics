@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from . import figures
-from .helping import checked_requests, helpful, load_all
+from .helping import checked_requests, helpful, load_all, logit_fit
 
 MIN_REQUESTS = 20  # weeks with fewer judged requests show no rate
 
@@ -56,19 +56,59 @@ def weekly(events, requests, responses, dyads):
     return out.reset_index()
 
 
-def by_goal_type(dyads, goals):
-    """Response rates by what the swarm was told to do, within era."""
-    d = dyads.merge(goals[["goal_id", "goal_type"]], on="goal_id", how="left")
-    per_req = d.groupby("request_id").agg(any_response=("responded", "any"), era=("era", "first"), goal_type=("goal_type", "first"))
-    t = pd.DataFrame(
+def by_goal_type(dyads, goals, n_boot=1000, seed=0):
+    """Response rates by what the swarm was told to do, within era. Each rate comes with a 95% interval from
+    resampling days within the era and kind of goal (requests cluster by day, so a plain binomial interval would be
+    too narrow), and every kind is set against the era's commonest kind by the odds that a given agent answers once
+    group size (log) and being addressed by name are held fixed: a logistic model, its interval again over days."""
+    rng = np.random.default_rng(seed)
+    d = dyads.merge(goals[["goal_id", "goal_type"]], on="goal_id", how="left").dropna(subset=["goal_type"])
+    keys = ["era", "goal_type", "day"]
+    per_req = d.groupby(keys + ["request_id"]).agg(any_response=("responded", "any"), active_n=("active_n", "first")).reset_index()
+    cells = pd.DataFrame(
         {
-            "requests": per_req.groupby(["era", "goal_type"]).size(),
-            "answered_by_anyone": per_req.groupby(["era", "goal_type"]).any_response.mean(),
-            "each_agent_responds": d.groupby(["era", "goal_type"]).responded.mean(),
-            "addressed_agent_responds": d[d.addressed].groupby(["era", "goal_type"]).responded.mean(),
+            "req": per_req.groupby(keys).size(), "req_ans": per_req.groupby(keys).any_response.sum(),
+            "pair": d.groupby(keys).size(), "pair_ans": d.groupby(keys).responded.sum(),
+            "addr": d[d.addressed].groupby(keys).size(), "addr_ans": d[d.addressed].groupby(keys).responded.sum(),
         }
-    )
-    return t.reset_index()
+    ).fillna(0).reset_index()
+    rates = [("answered_by_anyone", "req_ans", "req"), ("each_agent_responds", "pair_ans", "pair"), ("addressed_agent_responds", "addr_ans", "addr")]
+    rows = []
+    for (era, gt), c in cells.groupby(["era", "goal_type"], sort=True):
+        a = c[["req", "req_ans", "pair", "pair_ans", "addr", "addr_ans"]].to_numpy(float)
+        s = dict(zip(["req", "req_ans", "pair", "pair_ans", "addr", "addr_ans"], a.sum(0)))
+        b = a[rng.integers(0, len(c), size=(n_boot, len(c)))].sum(1)
+        bs = dict(zip(["req", "req_ans", "pair", "pair_ans", "addr", "addr_ans"], b.T))
+        row = {"era": era, "goal_type": gt, "requests": int(s["req"]), "days": int(len(c)), "agents_a_day": float(per_req[(per_req.era == era) & (per_req.goal_type == gt)].active_n.mean())}
+        for name, num, den in rates:
+            row[name] = s[num] / s[den] if s[den] else np.nan
+            draws = bs[num] / np.where(bs[den] > 0, bs[den], np.nan)
+            row[name + "_lo"], row[name + "_hi"] = (np.nanpercentile(draws, [2.5, 97.5]) if np.isfinite(draws).any() else (np.nan, np.nan))
+        rows.append(row)
+    t = pd.DataFrame(rows)
+    t["main"], t["odds_vs_main"], t["odds_lo"], t["odds_hi"] = "", np.nan, np.nan, np.nan
+    for era, te in t.groupby("era"):
+        kinds = te.sort_values("requests", ascending=False).goal_type.tolist()
+        t.loc[te.index, "main"] = kinds[0]
+        if len(kinds) < 2:
+            continue
+        e = d[d.era == era]
+        X = np.c_[np.ones(len(e)), e.addressed.astype(float), np.log(e.active_n.clip(lower=1)), np.column_stack([(e.goal_type == k).astype(float) for k in kinds[1:]])]
+        y = e.responded.to_numpy(float)
+        fit = logit_fit(X, y)
+        days = e.day.to_numpy()
+        uniq = np.unique(days)
+        where = {u: np.flatnonzero(days == u) for u in uniq}
+        boots = []
+        for _ in range(min(n_boot, 200)):
+            ii = np.concatenate([where[u] for u in rng.choice(uniq, size=len(uniq), replace=True)])
+            boots.append(logit_fit(X[ii], y[ii]))
+        boots = np.array(boots)
+        for j, k in enumerate(kinds[1:]):
+            i = te.index[te.goal_type == k][0]
+            t.loc[i, "odds_vs_main"] = np.exp(fit[3 + j])
+            t.loc[i, ["odds_lo", "odds_hi"]] = np.exp(np.percentile(boots[:, 3 + j], [2.5, 97.5]))
+    return t
 
 
 def run(in_dir, meta=None):
@@ -94,8 +134,8 @@ def run(in_dir, meta=None):
     if goals_path and goals_path.exists():
         t = by_goal_type(dyads, pd.read_csv(goals_path))
         t.to_csv(in_dir / "trends_goal_type.csv", index=False)
-        print("\nresponse rates by goal type, within era")
-        print(t.round(3).to_string(index=False))
+        print("\nresponse rates by goal type, within era (95% intervals over days; odds against the era's commonest kind, group size and addressing held fixed)")
+        print(t[["era", "goal_type", "requests", "agents_a_day", "answered_by_anyone", "each_agent_responds", "addressed_agent_responds", "odds_vs_main", "odds_lo", "odds_hi"]].round(3).to_string(index=False))
     # The same two networks drawn per quarter: who mentions whom, and who answers whose requests.
     agents = pd.read_parquet(in_dir / "agents.parquet")
     m = pd.read_parquet(in_dir / "mentions.parquet")

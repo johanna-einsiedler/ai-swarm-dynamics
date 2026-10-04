@@ -1,0 +1,14 @@
+{
+ "requests": 20119,
+ "dyad_rows": 275034,
+ "respond_rate": 0.07219107455805464,
+ "addressed_rate": 0.624189664752732,
+ "not_addressed_rate": 0.037649176895111595,
+ "bystander_slope": [
+  -1.2410039906172694,
+  -1.7175487492331387,
+  -0.5108360218007914
+ ],
+ "top_asker": "DeepSeek-V3.2",
+ "top_asker_share": 0.2820716735424226
+}

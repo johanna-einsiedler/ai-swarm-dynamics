@@ -1,0 +1,479 @@
+source,adopter,weight
+Claude 3.5 Sonnet,o1,0.5
+Claude 3.7 Sonnet,Claude 3.5 Sonnet,1.0
+Claude 3.7 Sonnet,Claude Haiku 4.5,6.831349206349206
+Claude 3.7 Sonnet,Claude Opus 4.1,2.1166666666666663
+Claude 3.7 Sonnet,Claude Opus 4.5,7.542857142857143
+Claude 3.7 Sonnet,Claude Opus 4.6,0.47619047619047616
+Claude 3.7 Sonnet,Claude Sonnet 4.5,9.952380952380953
+Claude 3.7 Sonnet,DeepSeek-V3.2,7.08809523809524
+Claude 3.7 Sonnet,GPT-5,2.642857142857143
+Claude 3.7 Sonnet,GPT-5.1,8.164285714285715
+Claude 3.7 Sonnet,GPT-5.2,10.01904761904762
+Claude 3.7 Sonnet,Gemini 2.5 Pro,9.417496392496394
+Claude 3.7 Sonnet,Gemini 3 Pro,6.484523809523809
+Claude 3.7 Sonnet,Grok 4,0.25
+Claude 3.7 Sonnet,Opus 4.5 (Claude Code),0.5178571428571428
+Claude 3.7 Sonnet,o1,0.5
+Claude 3.7 Sonnet,o3,1.0333333333333332
+Claude Fable 5,Claude Haiku 4.5,1.1944444444444444
+Claude Fable 5,Claude Opus 4.5,0.2
+Claude Fable 5,Claude Opus 4.7,0.25
+Claude Fable 5,Claude Opus 4.8,0.5
+Claude Fable 5,DeepSeek-V3.2,3.142857142857143
+Claude Fable 5,DeepSeek-V4-Pro,0.3333333333333333
+Claude Fable 5,GLM-5.2,0.9
+Claude Fable 5,GPT-5,0.1111111111111111
+Claude Fable 5,GPT-5.1,0.7857142857142857
+Claude Fable 5,GPT-5.2,2.15
+Claude Fable 5,GPT-5.4,3.416666666666667
+Claude Fable 5,GPT-5.5,1.3333333333333333
+Claude Fable 5,Gemini 2.5 Pro,0.16666666666666666
+Claude Fable 5,Gemini 3.1 Pro,0.25
+Claude Fable 5,Gemini 3.5 Flash,3.825
+Claude Fable 5.1,Claude Haiku 4.5,0.3333333333333333
+Claude Fable 5.1,DeepSeek-V3.2,0.5
+Claude Fable 5.1,DeepSeek-V4-Pro,1.0
+Claude Haiku 4.5,Claude 3.7 Sonnet,15.629761904761903
+Claude Haiku 4.5,Claude Fable 5,0.41666666666666663
+Claude Haiku 4.5,Claude Opus 4.1,2.95
+Claude Haiku 4.5,Claude Opus 4.5,21.896428571428558
+Claude Haiku 4.5,Claude Opus 4.6,5.942857142857142
+Claude Haiku 4.5,Claude Sonnet 4.5,20.982539682539677
+Claude Haiku 4.5,Claude Sonnet 4.6,9.173809523809522
+Claude Haiku 4.5,DeepSeek-V3.2,26.005555555555542
+Claude Haiku 4.5,GLM-5.2,0.325
+Claude Haiku 4.5,GPT-5,2.526190476190476
+Claude Haiku 4.5,GPT-5.1,28.81150793650792
+Claude Haiku 4.5,GPT-5.2,28.55634920634919
+Claude Haiku 4.5,GPT-5.4,4.70952380952381
+Claude Haiku 4.5,GPT-5.5,0.8666666666666667
+Claude Haiku 4.5,Gemini 2.5 Pro,19.404834054834048
+Claude Haiku 4.5,Gemini 3 Pro,17.339682539682542
+Claude Haiku 4.5,Gemini 3.1 Pro,1.15
+Claude Haiku 4.5,Gemini 3.5 Flash,0.25
+Claude Haiku 4.5,Kimi K2.6,0.25
+Claude Haiku 4.5,Opus 4.5 (Claude Code),3.235714285714286
+Claude Haiku 4.5,o3,1.7833333333333332
+Claude Opus 4,Claude 3.7 Sonnet,1.0
+Claude Opus 4,Gemini 2.5 Pro,0.5
+Claude Opus 4,o3,0.3333333333333333
+Claude Opus 4.1,Claude 3.7 Sonnet,4.233333333333333
+Claude Opus 4.1,Claude Haiku 4.5,2.0595238095238093
+Claude Opus 4.1,Claude Sonnet 4.5,2.95
+Claude Opus 4.1,GPT-5,2.6166666666666667
+Claude Opus 4.1,Gemini 2.5 Pro,1.9416666666666667
+Claude Opus 4.1,Gemini 3 Pro,0.7833333333333333
+Claude Opus 4.1,Grok 4,1.25
+Claude Opus 4.1,o3,0.95
+Claude Opus 4.5,Claude 3.7 Sonnet,11.240873015873019
+Claude Opus 4.5,Claude Fable 5,0.16666666666666666
+Claude Opus 4.5,Claude Haiku 4.5,39.37582972582973
+Claude Opus 4.5,Claude Opus 4.6,16.16190476190476
+Claude Opus 4.5,Claude Opus 4.7,0.26785714285714285
+Claude Opus 4.5,Claude Opus 4.8,0.5
+Claude Opus 4.5,Claude Sonnet 4.5,28.70158730158729
+Claude Opus 4.5,Claude Sonnet 4.6,12.671428571428576
+Claude Opus 4.5,DeepSeek-V3.2,46.71746031746033
+Claude Opus 4.5,GLM-5.2,0.125
+Claude Opus 4.5,GPT-5,3.8178571428571426
+Claude Opus 4.5,GPT-5.1,39.22499999999999
+Claude Opus 4.5,GPT-5.2,48.543650793650805
+Claude Opus 4.5,GPT-5.4,8.199999999999998
+Claude Opus 4.5,GPT-5.5,0.5666666666666667
+Claude Opus 4.5,Gemini 2.5 Pro,17.67388167388167
+Claude Opus 4.5,Gemini 3 Pro,25.63730158730158
+Claude Opus 4.5,Gemini 3.1 Pro,5.092857142857143
+Claude Opus 4.5,Gemini 3.5 Flash,0.5
+Claude Opus 4.5,Opus 4.5 (Claude Code),5.202380952380952
+Claude Opus 4.6,Claude 3.7 Sonnet,1.7944444444444443
+Claude Opus 4.6,Claude Haiku 4.5,14.084559884559889
+Claude Opus 4.6,Claude Opus 4.5,29.88571428571428
+Claude Opus 4.6,Claude Opus 4.7,0.6011904761904762
+Claude Opus 4.6,Claude Sonnet 4.5,9.234920634920636
+Claude Opus 4.6,Claude Sonnet 4.6,29.030952380952375
+Claude Opus 4.6,DeepSeek-V3.2,32.584126984126975
+Claude Opus 4.6,GPT-5,1.5583333333333333
+Claude Opus 4.6,GPT-5.1,30.720238095238088
+Claude Opus 4.6,GPT-5.2,30.99365079365078
+Claude Opus 4.6,GPT-5.4,10.316666666666668
+Claude Opus 4.6,GPT-5.5,0.4
+Claude Opus 4.6,Gemini 2.5 Pro,6.421103896103896
+Claude Opus 4.6,Gemini 3 Pro,12.396825396825399
+Claude Opus 4.6,Gemini 3.1 Pro,11.509523809523811
+Claude Opus 4.6,Opus 4.5 (Claude Code),12.860714285714286
+Claude Opus 4.7,Claude Haiku 4.5,1.8888888888888888
+Claude Opus 4.7,Claude Opus 4.5,0.5
+Claude Opus 4.7,Claude Opus 4.6,0.3333333333333333
+Claude Opus 4.7,Claude Sonnet 4.5,0.3333333333333333
+Claude Opus 4.7,Claude Sonnet 4.6,0.3333333333333333
+Claude Opus 4.7,DeepSeek-V3.2,3.658333333333333
+Claude Opus 4.7,GLM-5.2,0.125
+Claude Opus 4.7,GPT-5,0.5
+Claude Opus 4.7,GPT-5.1,1.4206349206349205
+Claude Opus 4.7,GPT-5.2,1.7333333333333332
+Claude Opus 4.7,GPT-5.4,3.033333333333333
+Claude Opus 4.7,GPT-5.5,5.033333333333333
+Claude Opus 4.7,Gemini 2.5 Pro,0.16666666666666666
+Claude Opus 4.7,Gemini 3.1 Pro,2.5833333333333335
+Claude Opus 4.7,Gemini 3.5 Flash,0.2
+Claude Opus 4.7,Kimi K2.6,2.033333333333333
+Claude Opus 4.8,Claude Fable 5,2.6666666666666665
+Claude Opus 4.8,Claude Haiku 4.5,0.8428571428571429
+Claude Opus 4.8,Claude Opus 4.5,0.3333333333333333
+Claude Opus 4.8,Claude Opus 4.7,0.3333333333333333
+Claude Opus 4.8,Claude Opus 5,0.75
+Claude Opus 4.8,Claude Sonnet 4.6,0.25
+Claude Opus 4.8,DeepSeek-V3.2,4.05952380952381
+Claude Opus 4.8,Fine-Tuned Leader,2.8333333333333335
+Claude Opus 4.8,GLM-5.2,2.075
+Claude Opus 4.8,GPT-5,0.3333333333333333
+Claude Opus 4.8,GPT-5.1,2.408333333333333
+Claude Opus 4.8,GPT-5.2,3.2
+Claude Opus 4.8,GPT-5.4,1.3928571428571428
+Claude Opus 4.8,GPT-5.5,7.2857142857142865
+Claude Opus 4.8,Gemini 2.5 Pro,1.0833333333333333
+Claude Opus 4.8,Gemini 3.1 Pro,0.4
+Claude Opus 4.8,Gemini 3.5 Flash,6.1499999999999995
+Claude Opus 4.8,Grok 4.5,0.8333333333333333
+Claude Opus 4.8,Kimi K2.6,3.666666666666667
+Claude Opus 5,Claude Fable 5,0.3333333333333333
+Claude Opus 5,Claude Opus 4.8,0.3333333333333333
+Claude Opus 5,Claude Sonnet 4.6,1.0
+Claude Opus 5,GLM-5.2,1.5
+Claude Opus 5,GPT-5.4,0.3333333333333333
+Claude Opus 5,GPT-5.5,0.5
+Claude Opus 5,Gemini 3.5 Flash,0.5
+Claude Opus 5,Grok 4.5,1.3333333333333333
+Claude Sonnet 4.5,Claude 3.7 Sonnet,8.995634920634922
+Claude Sonnet 4.5,Claude Haiku 4.5,15.676226551226554
+Claude Sonnet 4.5,Claude Opus 4.1,3.2500000000000004
+Claude Sonnet 4.5,Claude Opus 4.5,12.489285714285717
+Claude Sonnet 4.5,Claude Opus 4.6,7.276190476190476
+Claude Sonnet 4.5,Claude Opus 4.7,0.26785714285714285
+Claude Sonnet 4.5,Claude Sonnet 4.6,5.596428571428571
+Claude Sonnet 4.5,DeepSeek-V3.2,16.122222222222227
+Claude Sonnet 4.5,GPT-5,3.026190476190476
+Claude Sonnet 4.5,GPT-5.1,9.863095238095243
+Claude Sonnet 4.5,GPT-5.2,15.574603174603178
+Claude Sonnet 4.5,GPT-5.4,2.3166666666666664
+Claude Sonnet 4.5,GPT-5.5,0.4
+Claude Sonnet 4.5,Gemini 2.5 Pro,10.486976911976914
+Claude Sonnet 4.5,Gemini 3 Pro,8.971825396825398
+Claude Sonnet 4.5,Gemini 3.1 Pro,2.5928571428571425
+Claude Sonnet 4.5,Opus 4.5 (Claude Code),1.9345238095238093
+Claude Sonnet 4.5,o3,2.7833333333333337
+Claude Sonnet 4.6,Claude Fable 5,0.3333333333333333
+Claude Sonnet 4.6,Claude Haiku 4.5,9.91352813852814
+Claude Sonnet 4.6,Claude Opus 4.5,20.44523809523809
+Claude Sonnet 4.6,Claude Opus 4.6,13.109523809523811
+Claude Sonnet 4.6,Claude Opus 4.8,0.5
+Claude Sonnet 4.6,Claude Sonnet 4.5,6.5849206349206355
+Claude Sonnet 4.6,DeepSeek-V3.2,23.867460317460306
+Claude Sonnet 4.6,GLM-5.2,0.5
+Claude Sonnet 4.6,GPT-5,2.5583333333333336
+Claude Sonnet 4.6,GPT-5.1,20.680555555555554
+Claude Sonnet 4.6,GPT-5.2,28.915079365079354
+Claude Sonnet 4.6,GPT-5.4,4.95
+Claude Sonnet 4.6,Gemini 2.5 Pro,8.60400432900433
+Claude Sonnet 4.6,Gemini 3 Pro,6.921825396825397
+Claude Sonnet 4.6,Gemini 3.1 Pro,5.459523809523809
+Claude Sonnet 4.6,Opus 4.5 (Claude Code),7.201190476190476
+Claude Sonnet 5,Claude Haiku 4.5,0.25
+Claude Sonnet 5,DeepSeek-V3.2,0.6666666666666666
+Claude Sonnet 5,DeepSeek-V4-Pro,0.3333333333333333
+Claude Sonnet 5,GLM-5.2,2.0
+Claude Sonnet 5,GPT-5,0.5
+Claude Sonnet 5,GPT-5.2,1.0
+Claude Sonnet 5,Gemini 3.5 Flash,1.0
+DeepSeek-V3.2,Claude 3.7 Sonnet,10.77420634920635
+DeepSeek-V3.2,Claude Fable 5,0.8928571428571428
+DeepSeek-V3.2,Claude Haiku 4.5,41.70757575757575
+DeepSeek-V3.2,Claude Opus 4.5,33.388095238095225
+DeepSeek-V3.2,Claude Opus 4.6,14.145238095238096
+DeepSeek-V3.2,Claude Opus 4.7,1.7416666666666665
+DeepSeek-V3.2,Claude Opus 4.8,1.5333333333333332
+DeepSeek-V3.2,Claude Sonnet 4.5,16.99444444444445
+DeepSeek-V3.2,Claude Sonnet 4.6,14.240476190476194
+DeepSeek-V3.2,DeepSeek-V4-Pro,0.5
+DeepSeek-V3.2,GLM-5.2,2.1999999999999997
+DeepSeek-V3.2,GPT-5,4.795634920634921
+DeepSeek-V3.2,GPT-5.1,51.8011904761905
+DeepSeek-V3.2,GPT-5.2,55.32698412698415
+DeepSeek-V3.2,GPT-5.4,15.142857142857146
+DeepSeek-V3.2,GPT-5.5,3.3857142857142857
+DeepSeek-V3.2,Gemini 2.5 Pro,25.563167388167372
+DeepSeek-V3.2,Gemini 3 Pro,26.846825396825388
+DeepSeek-V3.2,Gemini 3.1 Pro,11.826190476190478
+DeepSeek-V3.2,Gemini 3.5 Flash,3.275
+DeepSeek-V3.2,Grok 4.5,0.5
+DeepSeek-V3.2,Kimi K2.6,1.9833333333333332
+DeepSeek-V3.2,Opus 4.5 (Claude Code),6.3619047619047615
+DeepSeek-V4-Pro,Claude Fable 5,0.5
+DeepSeek-V4-Pro,Claude Haiku 4.5,0.8611111111111112
+DeepSeek-V4-Pro,Claude Opus 4.7,0.45
+DeepSeek-V4-Pro,DeepSeek-V3.2,1.5
+DeepSeek-V4-Pro,GLM-5.2,0.125
+DeepSeek-V4-Pro,GPT-5,1.0
+DeepSeek-V4-Pro,GPT-5.1,1.7261904761904763
+DeepSeek-V4-Pro,GPT-5.2,1.7
+DeepSeek-V4-Pro,GPT-5.4,0.5
+DeepSeek-V4-Pro,Gemini 2.5 Pro,0.16666666666666666
+Fine-Tuned Leader,Claude Opus 4.7,0.3333333333333333
+Fine-Tuned Leader,Claude Opus 4.8,2.75
+Fine-Tuned Leader,GPT-5.5,2.5
+Fine-Tuned Leader,Gemini 3.5 Flash,2.45
+Fine-Tuned Leader,Kimi K2.6,3.0
+GLM-5.2,Claude Fable 5,0.8333333333333333
+GLM-5.2,Claude Haiku 4.5,1.2277777777777776
+GLM-5.2,Claude Opus 4.5,2.333333333333333
+GLM-5.2,Claude Opus 4.8,0.3333333333333333
+GLM-5.2,Claude Opus 5,0.75
+GLM-5.2,Claude Sonnet 4.5,0.5
+GLM-5.2,DeepSeek-V3.2,4.0
+GLM-5.2,DeepSeek-V4-Pro,0.3333333333333333
+GLM-5.2,GLM-5.3 Flash,0.5
+GLM-5.2,GPT-5,1.25
+GLM-5.2,GPT-5.1,3.1166666666666663
+GLM-5.2,GPT-5.2,1.6666666666666665
+GLM-5.2,GPT-5.6 Terra,0.5
+GLM-5.2,Gemini 3.5 Flash,2.333333333333333
+GLM-5.2,Grok 4.5,0.3333333333333333
+GLM-5.2,Kimi K2.6,0.25
+GLM-5.3 Flash,DeepSeek-V3.2,0.3333333333333333
+GLM-5.3 Flash,GPT-5,0.25
+GPT-5,Claude 3.7 Sonnet,2.7777777777777777
+GPT-5,Claude Fable 5,1.0
+GPT-5,Claude Haiku 4.5,5.98059163059163
+GPT-5,Claude Opus 4.1,1.2
+GPT-5,Claude Opus 4.5,1.5761904761904761
+GPT-5,Claude Opus 4.6,0.3333333333333333
+GPT-5,Claude Opus 4.7,0.25
+GPT-5,Claude Opus 4.8,1.8333333333333333
+GPT-5,Claude Sonnet 4.5,2.308333333333333
+GPT-5,DeepSeek-V3.2,7.324999999999999
+GPT-5,GLM-5.2,0.7916666666666666
+GPT-5,GPT-5.1,4.935714285714286
+GPT-5,GPT-5.2,3.4611111111111112
+GPT-5,GPT-5.5,0.7095238095238094
+GPT-5,Gemini 2.5 Pro,2.467929292929293
+GPT-5,Gemini 3 Pro,0.8666666666666667
+GPT-5,Gemini 3.5 Flash,0.25
+GPT-5,Grok 4,0.25
+GPT-5,Opus 4.5 (Claude Code),1.5
+GPT-5,o3,1.45
+GPT-5.1,Claude 3.7 Sonnet,13.407539682539683
+GPT-5.1,Claude Fable 5,1.6428571428571428
+GPT-5.1,Claude Haiku 4.5,34.30202020202018
+GPT-5.1,Claude Opus 4.1,0.25
+GPT-5.1,Claude Opus 4.5,36.2392857142857
+GPT-5.1,Claude Opus 4.6,12.645238095238097
+GPT-5.1,Claude Opus 4.7,0.2
+GPT-5.1,Claude Opus 4.8,1.2
+GPT-5.1,Claude Opus 5,0.25
+GPT-5.1,Claude Sonnet 4.5,23.0611111111111
+GPT-5.1,Claude Sonnet 4.6,15.414285714285716
+GPT-5.1,Claude Sonnet 5,0.5
+GPT-5.1,DeepSeek-V3.2,56.08293650793654
+GPT-5.1,DeepSeek-V4-Pro,0.3333333333333333
+GPT-5.1,GLM-5.2,3.7083333333333335
+GPT-5.1,GPT-5,2.8194444444444446
+GPT-5.1,GPT-5.2,60.74365079365083
+GPT-5.1,GPT-5.4,8.433333333333332
+GPT-5.1,GPT-5.5,0.5928571428571429
+GPT-5.1,GPT-5.6 Terra,0.5
+GPT-5.1,Gemini 2.5 Pro,33.58102453102451
+GPT-5.1,Gemini 3 Pro,39.87301587301586
+GPT-5.1,Gemini 3.1 Pro,9.792857142857144
+GPT-5.1,Gemini 3.5 Flash,1.8249999999999997
+GPT-5.1,Kimi K2.6,1.45
+GPT-5.1,Opus 4.5 (Claude Code),4.795238095238094
+GPT-5.1,o3,1.5
+GPT-5.2,Claude 3.7 Sonnet,11.607539682539684
+GPT-5.2,Claude Fable 5,0.5595238095238095
+GPT-5.2,Claude Haiku 4.5,39.092099567099545
+GPT-5.2,Claude Opus 4.5,46.915476190476205
+GPT-5.2,Claude Opus 4.6,18.102380952380955
+GPT-5.2,Claude Opus 4.7,0.8011904761904762
+GPT-5.2,Claude Opus 4.8,2.3666666666666667
+GPT-5.2,Claude Opus 5,0.25
+GPT-5.2,Claude Sonnet 4.5,19.303968253968243
+GPT-5.2,Claude Sonnet 4.6,19.363095238095237
+GPT-5.2,DeepSeek-V3.2,71.24841269841272
+GPT-5.2,DeepSeek-V4-Pro,1.0
+GPT-5.2,GLM-5.2,2.6166666666666667
+GPT-5.2,GPT-5,3.378968253968254
+GPT-5.2,GPT-5.1,69.03333333333336
+GPT-5.2,GPT-5.4,13.183333333333335
+GPT-5.2,GPT-5.5,1.1523809523809523
+GPT-5.2,Gemini 2.5 Pro,30.706024531024507
+GPT-5.2,Gemini 3 Pro,34.91190476190476
+GPT-5.2,Gemini 3.1 Pro,5.683333333333332
+GPT-5.2,Gemini 3.5 Flash,2.525
+GPT-5.2,Kimi K2.6,1.2333333333333334
+GPT-5.2,Opus 4.5 (Claude Code),5.2369047619047615
+GPT-5.4,Claude Fable 5,0.39285714285714285
+GPT-5.4,Claude Haiku 4.5,5.448412698412698
+GPT-5.4,Claude Opus 4.5,7.375
+GPT-5.4,Claude Opus 4.6,4.342857142857143
+GPT-5.4,Claude Opus 4.7,3.1011904761904763
+GPT-5.4,Claude Opus 4.8,1.7
+GPT-5.4,Claude Sonnet 4.5,2.869047619047619
+GPT-5.4,Claude Sonnet 4.6,4.5
+GPT-5.4,DeepSeek-V3.2,16.275000000000002
+GPT-5.4,GLM-5.2,0.2
+GPT-5.4,GPT-5,2.6444444444444444
+GPT-5.4,GPT-5.1,9.094444444444443
+GPT-5.4,GPT-5.2,17.276190476190482
+GPT-5.4,GPT-5.5,4.376190476190476
+GPT-5.4,Gemini 2.5 Pro,2.6666666666666665
+GPT-5.4,Gemini 3.1 Pro,12.900000000000004
+GPT-5.4,Gemini 3.5 Flash,1.075
+GPT-5.4,Grok 4.5,0.5
+GPT-5.4,Kimi K2.6,1.2333333333333334
+GPT-5.5,Claude Fable 5,0.6666666666666666
+GPT-5.5,Claude Haiku 4.5,0.8611111111111112
+GPT-5.5,Claude Opus 4.5,0.25
+GPT-5.5,Claude Opus 4.7,1.6345238095238095
+GPT-5.5,Claude Opus 4.8,2.4166666666666665
+GPT-5.5,DeepSeek-V3.2,4.875
+GPT-5.5,DeepSeek-V4-Pro,0.5
+GPT-5.5,Fine-Tuned Leader,2.833333333333333
+GPT-5.5,GPT-5.1,3.1623015873015876
+GPT-5.5,GPT-5.2,6.242857142857142
+GPT-5.5,GPT-5.4,6.142857142857142
+GPT-5.5,Gemini 3.1 Pro,3.0166666666666666
+GPT-5.5,Gemini 3.5 Flash,4.783333333333334
+GPT-5.5,Kimi K2.6,5.033333333333333
+GPT-5.6 Luna,Claude Fable 5,0.5
+GPT-5.6 Luna,Claude Opus 4.8,1.0
+GPT-5.6 Terra,Claude Fable 5,0.14285714285714285
+GPT-5.6 Terra,DeepSeek-V3.2,0.25
+GPT-5.6 Terra,GPT-5,0.1111111111111111
+GPT-5.6 Terra,GPT-5.1,1.0
+GPT-5.6 Terra,GPT-5.2,0.5
+GPT-5.6 Terra,GPT-5.4,0.3333333333333333
+GPT-5.6 Terra,Gemini 3.1 Pro,0.16666666666666666
+GPT-5.6 Terra,Gemini 3.5 Flash,0.4583333333333333
+GPT-5.6 Terra,Kimi K2.6,0.2
+GPT-6 Astra,DeepSeek-V3.2,0.3333333333333333
+GPT-6 Astra,GLM-5.2,1.0
+GPT-6 Astra,GLM-5.3 Flash,0.5
+GPT-6 Astra,GPT-5,0.25
+Gemini 2.5 Pro,Claude 3.7 Sonnet,5.253571428571428
+Gemini 2.5 Pro,Claude Fable 5,0.41666666666666663
+Gemini 2.5 Pro,Claude Haiku 4.5,11.179401154401157
+Gemini 2.5 Pro,Claude Opus 4.1,2.4499999999999997
+Gemini 2.5 Pro,Claude Opus 4.5,14.636904761904763
+Gemini 2.5 Pro,Claude Opus 4.6,4.161904761904762
+Gemini 2.5 Pro,Claude Opus 4.8,0.5
+Gemini 2.5 Pro,Claude Sonnet 4.5,9.717857142857145
+Gemini 2.5 Pro,Claude Sonnet 4.6,3.3845238095238095
+Gemini 2.5 Pro,DeepSeek-V3.2,13.583730158730162
+Gemini 2.5 Pro,GLM-5.2,0.45
+Gemini 2.5 Pro,GPT-5,0.7833333333333333
+Gemini 2.5 Pro,GPT-5.1,14.049206349206354
+Gemini 2.5 Pro,GPT-5.2,14.102380952380956
+Gemini 2.5 Pro,GPT-5.4,1.7333333333333332
+Gemini 2.5 Pro,GPT-5.5,0.2857142857142857
+Gemini 2.5 Pro,Gemini 3 Pro,12.071825396825394
+Gemini 2.5 Pro,Gemini 3.1 Pro,3.166666666666667
+Gemini 2.5 Pro,Gemini 3.5 Flash,0.5333333333333333
+Gemini 2.5 Pro,Grok 4,0.25
+Gemini 2.5 Pro,Opus 4.5 (Claude Code),3.441666666666667
+Gemini 2.5 Pro,o3,3.666666666666667
+Gemini 3 Pro,Claude 3.7 Sonnet,8.307539682539682
+Gemini 3 Pro,Claude Haiku 4.5,21.128607503607498
+Gemini 3 Pro,Claude Opus 4.5,25.863095238095223
+Gemini 3 Pro,Claude Opus 4.6,15.450000000000001
+Gemini 3 Pro,Claude Sonnet 4.5,12.456349206349206
+Gemini 3 Pro,Claude Sonnet 4.6,9.379761904761907
+Gemini 3 Pro,DeepSeek-V3.2,30.80674603174601
+Gemini 3 Pro,GPT-5,1.5678571428571428
+Gemini 3 Pro,GPT-5.1,37.528174603174605
+Gemini 3 Pro,GPT-5.2,30.73412698412697
+Gemini 3 Pro,Gemini 2.5 Pro,20.681024531024526
+Gemini 3 Pro,Opus 4.5 (Claude Code),4.511904761904762
+Gemini 3.1 Pro,Claude Fable 5,0.14285714285714285
+Gemini 3.1 Pro,Claude Haiku 4.5,4.315079365079365
+Gemini 3.1 Pro,Claude Opus 4.5,8.517857142857142
+Gemini 3.1 Pro,Claude Opus 4.6,6.95
+Gemini 3.1 Pro,Claude Opus 4.7,1.7678571428571428
+Gemini 3.1 Pro,Claude Sonnet 4.5,4.3690476190476195
+Gemini 3.1 Pro,Claude Sonnet 4.6,5.1761904761904765
+Gemini 3.1 Pro,DeepSeek-V3.2,18.034523809523808
+Gemini 3.1 Pro,GPT-5,0.6111111111111112
+Gemini 3.1 Pro,GPT-5.1,8.31111111111111
+Gemini 3.1 Pro,GPT-5.2,13.619047619047626
+Gemini 3.1 Pro,GPT-5.4,12.326190476190476
+Gemini 3.1 Pro,GPT-5.5,2.0666666666666664
+Gemini 3.1 Pro,Gemini 2.5 Pro,0.9833333333333334
+Gemini 3.1 Pro,Gemini 3.5 Flash,0.9916666666666667
+Gemini 3.1 Pro,Kimi K2.6,0.3333333333333333
+Gemini 3.1 Pro,Opus 4.5 (Claude Code),0.2
+Gemini 3.5 Flash,Claude Fable 5,2.4166666666666665
+Gemini 3.5 Flash,Claude Haiku 4.5,1.342857142857143
+Gemini 3.5 Flash,Claude Opus 4.5,0.3333333333333333
+Gemini 3.5 Flash,Claude Opus 4.8,5.783333333333332
+Gemini 3.5 Flash,DeepSeek-V3.2,4.05952380952381
+Gemini 3.5 Flash,DeepSeek-V4-Pro,0.3333333333333333
+Gemini 3.5 Flash,Fine-Tuned Leader,1.5
+Gemini 3.5 Flash,GLM-5.2,1.525
+Gemini 3.5 Flash,GPT-5,0.6444444444444444
+Gemini 3.5 Flash,GPT-5.1,2.408333333333333
+Gemini 3.5 Flash,GPT-5.2,4.816666666666666
+Gemini 3.5 Flash,GPT-5.4,3.4761904761904763
+Gemini 3.5 Flash,GPT-5.5,5.152380952380952
+Gemini 3.5 Flash,Gemini 2.5 Pro,0.8333333333333333
+Gemini 3.5 Flash,Gemini 3.1 Pro,1.1833333333333333
+Gemini 3.5 Flash,Grok 4.5,1.5
+Gemini 3.5 Flash,Kimi K2.6,2.3333333333333335
+Grok 4,Claude 3.7 Sonnet,0.3333333333333333
+Grok 4,GPT-5,0.25
+Grok 4,o3,0.5
+Grok 4.5,Claude Fable 5,1.8333333333333333
+Grok 4.5,Claude Haiku 4.5,0.5833333333333333
+Grok 4.5,Claude Sonnet 5,0.5
+Grok 4.5,DeepSeek-V3.2,1.0
+Grok 4.5,DeepSeek-V4-Pro,0.3333333333333333
+Grok 4.5,GLM-5.2,0.3333333333333333
+Grok 4.5,GPT-5.1,1.5
+Grok 4.5,GPT-5.2,0.8333333333333333
+Grok 4.5,GPT-5.4,0.3333333333333333
+Grok 4.5,GPT-5.5,0.5
+Kimi K2.6,Claude Fable 5,0.14285714285714285
+Kimi K2.6,Claude Haiku 4.5,0.25
+Kimi K2.6,Claude Opus 4.8,1.75
+Kimi K2.6,DeepSeek-V3.2,1.1666666666666665
+Kimi K2.6,Fine-Tuned Leader,1.8333333333333333
+Kimi K2.6,GLM-5.2,0.5
+Kimi K2.6,GPT-5,0.9444444444444444
+Kimi K2.6,GPT-5.1,1.625
+Kimi K2.6,GPT-5.2,1.0666666666666667
+Kimi K2.6,GPT-5.4,0.39285714285714285
+Kimi K2.6,GPT-5.5,4.892857142857142
+Kimi K2.6,Gemini 2.5 Pro,0.25
+Kimi K2.6,Gemini 3.1 Pro,2.1
+Kimi K2.6,Gemini 3.5 Flash,3.0750000000000006
+Opus 4.5 (Claude Code),Claude 3.7 Sonnet,1.2444444444444442
+Opus 4.5 (Claude Code),Claude Haiku 4.5,5.4599567099567095
+Opus 4.5 (Claude Code),Claude Opus 4.5,8.27857142857143
+Opus 4.5 (Claude Code),Claude Opus 4.6,7.569047619047619
+Opus 4.5 (Claude Code),Claude Sonnet 4.5,6.696825396825395
+Opus 4.5 (Claude Code),Claude Sonnet 4.6,5.485714285714285
+Opus 4.5 (Claude Code),DeepSeek-V3.2,5.713492063492064
+Opus 4.5 (Claude Code),GPT-5,0.475
+Opus 4.5 (Claude Code),GPT-5.1,6.795634920634921
+Opus 4.5 (Claude Code),GPT-5.2,7.224603174603175
+Opus 4.5 (Claude Code),GPT-5.4,0.3333333333333333
+Opus 4.5 (Claude Code),Gemini 2.5 Pro,1.2925324675324674
+Opus 4.5 (Claude Code),Gemini 3 Pro,4.194444444444445
+Opus 4.5 (Claude Code),Gemini 3.1 Pro,2.126190476190476
+o3,Claude 3.7 Sonnet,7.3999999999999995
+o3,Claude Haiku 4.5,7.809523809523809
+o3,Claude Opus 4.1,8.783333333333331
+o3,Claude Sonnet 4.5,8.983333333333333
+o3,GPT-5,4.033333333333333
+o3,GPT-5.1,4.833333333333333
+o3,Gemini 2.5 Pro,8.941666666666666
+o3,Gemini 3 Pro,2.7

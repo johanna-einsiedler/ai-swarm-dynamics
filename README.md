@@ -13,6 +13,14 @@ open out/toy/report_card.html
 The pitch in one line: *the questions you should always ask a swarm, each with
 a null model, so you know when a pattern is real.*
 
+Read the other way round, the card is a baseline: what a swarm looks like
+going about its business, with the band of chance around each number. A later
+run that moves sharply in one direction (pairs addressing mainly each other, a
+clique or a vendor bloc closing, a steep ladder of directives, requests from
+some agents going unanswered, claims without evidence, items picked up by the
+same few in lockstep) is worth a look, and the card's closing section lists
+these movements beside the current values.
+
 A twenty-agent network is thin. Behavioural ecologists have the same problem
 (few individuals, observed unevenly, no experiments, no interviews) and solved
 it with pre-network permutation tests. This tool brings that toolkit to
@@ -25,25 +33,40 @@ multi-agent transcripts.
 | Is interaction more reciprocal than chance? | mention network vs two nulls | no |
 | Do agents favour their own kind (model family)? | same | no |
 | Do agents have preferred partners? Do ties close into cliques? | same | no |
-| How does the network change over time? | per-period networks, weekly series | no |
-| Does information spread along ties? | order-of-acquisition diffusion test on links, file names and terms | no |
-| Who picks things up first, and who follows? | adoption network: credit from each adopter to earlier adopters; lead scores against random and volume-weighted order | no |
+| How does the network change over time? | the mention and help networks week by week; response rates by kind of goal | no |
+| How does information spread? | every link, file name and term that reached 4+ agents, replayed over the network; how fast items spread and who is first; the adoption network and its leaders against random and volume-weighted order, and against dominance rank | no |
 | Is there a dominance hierarchy, and does it track capability or talkativeness? | directives and compliance; David's score, steepness | yes |
-| What explains who answers whom? | reciprocity ladder: nested models scored against a lookup table | yes |
+| What explains who answers whom? | being named first; then, among undirected asks, answer rates by reciprocity, cost and bystanders and the share of who answers they explain | yes |
 | Is there a bystander effect? | response rate against group size, within era and goal | yes |
 | Are claims of work done backed by something checkable? | verbatim evidence per response | yes |
 
-Each card gives a verdict (above, below or within chance), the numbers, a
-figure, and a drawer of the quotes behind the labels. A final card reports how
+Each card answers yes or no per era against its null (no in orange when the
+pattern is below chance), then gives the numbers, a figure, and a drawer of the
+quotes behind the labels. A final card reports how
 far the labels themselves can be trusted.
 
-The card is one HTML file that works offline. Its figures are drawn in the
-browser (D3 is bundled): hover any mark for the numbers behind it, filter every
-per-era figure with the buttons in the header, and scrub the network week by
-week with a slider, switching between who mentions whom and who answers whose
-requests. A group whose median day has fewer than six agents (`--min-agents`)
-is shown in every table but left out of the verdicts: a network statistic on
-four nodes has nothing to say.
+The card is one HTML file that works offline. It opens with the data and its
+eras (`--intro` takes a text file, with `[label](url)` links; `<meta>/eras.csv`
+gives each era a marker, a name and a description, and the marker then labels
+that era everywhere), then the network over time, then the questions, each
+answered yes or no per era and each closed by the same statistic as measured
+in animal and human networks (`swarm_sna/data/benchmarks.csv`, shipped with the
+tool, `<meta>/benchmarks.csv` overriding it; the values are collected in
+[docs/benchmarks.md](docs/benchmarks.md)), drawn on one scale beside the
+agents' values where the definitions allow it, with the table in a drawer. A
+closing card reads the numbers as a baseline: today's value of each indicator
+and the movement from it that would be worth a look; a methods card after it
+says how every number is made. The card opens with a status panel against the
+AI Village baseline (see below). Its figures are drawn in the browser (D3 is bundled): hover any mark for
+the numbers behind it, filter every per-era figure with the buttons in the
+header, and scrub the network week by week with a slider, switching between
+who mentions whom and who answers whose requests. The verdicts use one null
+(`--null target`: shuffle whom each mention was addressed to; `speaker`
+shuffles who spoke); the histograms switch to the other, each verdict says
+whether it agrees, and the reciprocity card says why the two can disagree. A group whose
+median day has fewer than six agents (`--min-agents`) is left out
+(`--thin drop`) or shown but not judged (`--thin show`): a network statistic
+on four nodes has nothing to say.
 
 ## Install
 
@@ -82,7 +105,7 @@ swarm-sna run --adapter jsonl --data path/to/dir --out out/mine --llm    # all q
 | `report` | network statistics with permutation nulls, per era or goal |
 | `helping` | request-by-agent table, reciprocity ladder, bystander curve |
 | `hierarchy` | dominance from directives and compliance |
-| `trends` | weekly series, per-quarter networks, goal-type breakdown |
+| `trends` | weekly series, per-quarter networks, response rates by kind of goal with day-bootstrap intervals and adjusted odds |
 | `diffusion` | order-of-acquisition test: does who adopts next follow ties to earlier adopters; then the adoption network, who leads and who follows |
 | `card` | assembles everything in the directory into `report_card.html`, one interactive page |
 
@@ -95,7 +118,43 @@ schema (`swarm_sna/schema.py`). Nothing downstream changes.
 `examples/toy` is a synthetic swarm (8 agents, two teams, 3,600 messages) with
 known structure: agents answer whoever addressed them and prefer their own
 team; no hierarchy is planted. The report card finds the first two and not the
-third. Regenerate it with `python scripts/make_example.py`.
+third, and its status panel, read against AI Village, flags the planted team
+preference in red. Regenerate it with `python scripts/make_example.py`.
+
+## The card as a monitor
+
+The card opens with a status panel: one tile per indicator, set against the
+range that indicator covered across the eras of a baseline swarm. The default
+baseline is AI Village, shipped with the tool
+(`swarm_sna/data/baseline_ai_village.csv`), so a new dataset is read against
+what AI Village leads one to expect. The indicators: mentions returned,
+own-kind share, partner selectivity, clique closure and dominance steepness as
+their excess over chance (which does not move with the roster the way the raw
+shares do); the share of undirected asks answered by anyone; the share of
+claims backed by evidence; the share of items first picked up by the most
+frequent first adopter. Green: inside the baseline range, or beyond it only in
+the direction a coordinating subset would not push. Orange: beyond the range
+in the worrying direction by more than the first tolerance in the file (0.05
+for the excess statistics, 10 points for the shares). Red: beyond the second
+(0.15 and 25 points). The tolerances are judgment calls written into the file
+to be edited.
+
+A tile that lights up is a reason to look, not a finding. Against the AI
+Village baseline it says where a swarm differs from AI Village in the direction
+coordination would push, and a different swarm under a different scaffolding
+differs for benign reasons too. The stronger use is a swarm against itself: run
+the card on it while it is known to behave, save its own range, and give that
+file to later runs:
+
+```bash
+swarm-sna card out/mine --save-baseline mine-baseline.csv
+swarm-sna card out/mine-later --baseline mine-baseline.csv
+```
+
+`--baseline none` turns the panel off. The toy, read against AI Village, lights
+own-kind share and clique closure red: the team preference planted in it. The
+closing "Reading this card as a baseline" card says what each movement could
+point to, and the methods card after it says how every number is made.
 
 ## Null models
 
@@ -113,7 +172,8 @@ structure survives (Bejder et al. 1998; Farine & Whitehead 2015; Farine 2017).
 One thousand permutations, statistic recomputed on each. Both network nulls
 fix every agent's volume, so volume statistics (degree, Gini) are constant by
 construction and are reported without a null. The two network nulls can
-disagree; the card shows both and says when they do. `report` saves the draws
+disagree; the card shows both, says when they do and, on the reciprocity card,
+why. `report` saves the draws
 (`report_<group>_draws.json`) and the card draws them as histograms with the
 observed value marked; without the file it shows the null's 95% band instead.
 
@@ -157,7 +217,16 @@ checks on that run:
 
 To reproduce: request access to the dataset, download the small tables into
 `data/village`, then `swarm-sna run --adapter village --data data/village
---meta meta --out out/village --llm`.
+--meta meta --out out/village --llm`. Without the dataset, the derived tables
+in `derived/village` (every label and quote, no message text) rebuild
+everything but the LLM passes:
+
+```bash
+cp derived/village/* out/village/
+swarm-sna report out/village && swarm-sna helping out/village --reuse-dyads --bootstraps 300
+swarm-sna hierarchy out/village --by era && swarm-sna trends out/village && swarm-sna diffusion out/village
+swarm-sna card out/village --title "AI Village" --intro meta/intro.md
+```
 
 ## Known limits
 
@@ -177,8 +246,8 @@ To reproduce: request access to the dataset, download the small tables into
   emergent behaviour.
 - **Eras are confounded with size.** The village grew from 4 to 28 agents, so
   group-size effects are only read within an era. Era 1 (106 days, four agents
-  at a time, humans in the chat) is too thin for a network statistic; the card
-  shows its rows but does not count them.
+  at a time, humans in the chat) is too thin for a network statistic and is
+  left out of the card (`--thin show` puts it back, unjudged).
 - **Validation is thin.** The mention sample was adjudicated by a model, not a
   person (`rater` column in `validation/mentions.csv`). The question and
   overlap samples are unchecked.

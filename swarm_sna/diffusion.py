@@ -198,6 +198,15 @@ def _spearman(x, y):
 
 
 ITEM_COLUMNS = ["item", "adopters", "first_adopter", "first", "spread_days", "observed", "null_mean", "null_sd", "z", "p"]
+FILE_EXT = re.compile(r"\.(?:py|js|ts|md|json|csv|yaml|yml|sh|html|txt|ipynb)$")
+HOST = re.compile(r"^[a-z0-9.\-]+\.[a-z]{2,}(?:/|$)")
+
+
+def item_kind(item):
+    """link (a host, maybe with a path), file (a name with an extension) or term (a backticked token).
+    A masked name carries a '#hash' suffix (redact.label); it is ignored here."""
+    item = re.sub(r"#[0-9a-f]{6}$", "", str(item))
+    return "file" if FILE_EXT.search(item) else "link" if HOST.match(item) else "term"
 
 
 def _nothing(in_dir, why):
@@ -215,6 +224,11 @@ def run(in_dir, n_perm=N_PERM, seed=0):
     names = sorted(events[events.actor_class == "agent"].actor.unique())
     code = {a: i for i, a in enumerate(names)}
     fu = first_uses(events)
+    if fu.empty and (in_dir / "diffusion_adoptions.csv").exists():
+        # The published form of a run: the message text is gone but the adoptions it yielded are not, so the analysis is redone from them.
+        a = pd.read_csv(in_dir / "diffusion_adoptions.csv").rename(columns={"agent": "actor", "first_use": "ts", "first_use_event_id": "event_id"})
+        fu = a[["item", "actor", "ts", "event_id"]].assign(ts=lambda x: pd.to_datetime(x.ts)).sort_values(["item", "ts"]).reset_index(drop=True)
+        print(f"no message text in events.parquet; redoing the analysis from the {len(fu):,} adoptions in diffusion_adoptions.csv")
     if fu.empty:
         return _nothing(in_dir, "no traceable tokens (links, file names, backticked terms) in this transcript")
     items = select_items(fu)
@@ -288,4 +302,4 @@ def run(in_dir, n_perm=N_PERM, seed=0):
     figures.leaders(lead, in_dir / "fig_diffusion_leaders.png")
     summary.update(network_items=n_items, steepness=steep, steepness_random_null=u_mu, steepness_random_p=u_p, steepness_volume_null=s_mu, steepness_volume_p=s_p)
     pd.DataFrame([summary]).to_csv(in_dir / "diffusion_summary.csv", index=False)
-    print(f"\nwrote {in_dir}/diffusion_items.csv, diffusion_leaders.csv, diffusion_edges.csv, diffusion_correlates.csv, diffusion_summary.csv, fig_diffusion.png, fig_diffusion_leaders.png")
+    print(f"\nwrote {in_dir}/diffusion_items.csv, diffusion_adoptions.csv, diffusion_leaders.csv, diffusion_edges.csv, diffusion_correlates.csv, diffusion_summary.csv, fig_diffusion.png, fig_diffusion_leaders.png")
