@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import nulls
+from . import figures, nulls
 
 LABELS = {
     "reciprocity": "Reciprocity",
@@ -39,7 +39,7 @@ def figure(table, draws, groups, path, null="speaker"):
     import matplotlib.pyplot as plt
 
     stats = list(nulls.STATS)
-    fig, axes = plt.subplots(len(stats), len(groups), figsize=(3.4 * len(groups), 2.0 * len(stats)), squeeze=False)
+    fig, axes = plt.subplots(len(stats), len(groups), figsize=(max(7.5, 3.4 * len(groups)), 2.0 * len(stats)), squeeze=False)
     for r, s in enumerate(stats):
         for c, g in enumerate(groups):
             ax = axes[r][c]
@@ -80,8 +80,10 @@ def run(in_dir, n_perm=1000, group="era", seed=0, kinds=("at", "name")):
     draws = {(n, s, f"{group} {g}"): d for (n, s, g), d in draws.items()}
     groups = [f"{group} {g}" for g in stream.groups]
 
+    table["permutations"] = n_perm
     table.to_csv(in_dir / f"report_{group}.csv", index=False)
     figure(table, draws, groups, in_dir / f"report_{group}_nulls.png")
+    figures.networks(obs, stream.names, dict(zip(agents.agent, agents.family)), groups, in_dir / f"network_{group}.png")
     hwi = half_weight_index(events)
     hwi.to_csv(in_dir / "association_hwi.csv", index=False)
 
@@ -101,4 +103,4 @@ def run(in_dir, n_perm=1000, group="era", seed=0, kinds=("at", "name")):
         print(f"{LABELS[r.statistic]:22s}{r.group:8s}{r.observed:10.3f}")
     print("\nassociation (half-weight index over room-days), descriptive")
     print(hwi.groupby("era").hwi.describe()[["count", "mean", "50%", "max"]].round(3).to_string())
-    print(f"\nwrote {in_dir}/report_{group}.csv, report_{group}_nulls.png, association_hwi.csv")
+    print(f"\nwrote {in_dir}/report_{group}.csv, report_{group}_nulls.png, network_{group}.png, association_hwi.csv")

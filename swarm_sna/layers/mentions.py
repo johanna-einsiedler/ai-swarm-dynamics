@@ -35,11 +35,17 @@ def _norm(s):
     return re.sub(r"[\s\-_()\[\]]+", "", s).lower()
 
 
-def extract(events, agents):
+def active_sets(events):
+    talk = events[(events.type == "message") & (events.actor_class == "agent")]
+    return talk.groupby(["room", "day"]).actor.agg(set).to_dict()
+
+
+def extract(events, agents, active=None):
+    """`active` ({(room, day): agents}) defaults to who posted in `events`; pass it when `events` is not the full stream."""
     rx, owners = compile_aliases(agents)
     msgs = events[events.type == "message"]
-    talk = msgs[msgs.actor_class == "agent"]
-    active = talk.groupby(["room", "day"]).actor.agg(set).to_dict()
+    if active is None:
+        active = active_sets(events)
     joined = dict(zip(agents.agent, agents.joined))
     left = dict(zip(agents.agent, agents.left))
 

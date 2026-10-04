@@ -7,13 +7,17 @@ import glob
 import hashlib
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 MODEL = "haiku"
+BACKOFF_BASE = 20  # seconds; doubles each retry
+BACKOFF_CAP = 300
 # Nested-session variables that must not leak into the child CLI.
 _STRIP_ENV = ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN")
 
@@ -31,10 +35,35 @@ def _binary():
 def _parse_json(text):
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
     start = min([i for i in (text.find("["), text.find("{")) if i >= 0], default=0)
-    return json.loads(text[start:])
+    return json.JSONDecoder().raw_decode(text[start:])[0]  # ignore anything the model adds after the JSON
 
 
-def call(system, prompt, cache_dir, model=MODEL, retries=2):
+def _salvage(text):
+    """One bad object should not cost the whole batch: pull out every complete JSON object."""
+    out, depth, start, in_str, esc = [], 0, None, False, False
+    for i, ch in enumerate(text):
+        if in_str:
+            esc = ch == "\\" and not esc
+            in_str = not (ch == '"' and not esc)
+            continue
+        if ch == '"':
+            in_str, esc = True, False
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start is not None:
+                try:
+                    out.append(json.loads(text[start : i + 1]))
+                except json.JSONDecodeError:
+                    pass
+                start = None
+    return out
+
+
+def call(system, prompt, cache_dir, model=MODEL, retries=5):
     """One call -> parsed JSON. Cached on (model, system, prompt)."""
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -43,14 +72,23 @@ def call(system, prompt, cache_dir, model=MODEL, retries=2):
     if path.exists():
         return json.loads(path.read_text())
     env = {k: v for k, v in os.environ.items() if k not in _STRIP_ENV}
+    env["MAX_THINKING_TOKENS"] = "0"  # labelling needs no reasoning; with it on a call takes ten times as long
     err = None
-    for _ in range(retries + 1):
+    for attempt in range(retries + 1):
+        if attempt:  # a rate limit returns empty output, so back off rather than burning the queue
+            time.sleep(min(BACKOFF_CAP, BACKOFF_BASE * 2 ** (attempt - 1)) * (0.5 + random.random()))
         try:
             p = subprocess.run(
-                [_binary(), "-p", "--model", model, "--output-format", "json", "--system-prompt", system, "--tools", "", "--no-session-persistence"],
+                [_binary(), "-p", "--model", model, "--output-format", "json", "--system-prompt", system, "--tools", "", "--no-session-persistence", "--strict-mcp-config"],
                 input=prompt, capture_output=True, text=True, env=env, timeout=180, cwd=cache_dir,
             )
-            out = _parse_json(json.loads(p.stdout)["result"])
+            result = json.loads(p.stdout)["result"]
+            try:
+                out = _parse_json(result)
+            except json.JSONDecodeError:
+                out = _salvage(result)  # keep the objects the model did get right
+                if not out:
+                    raise
             path.write_text(json.dumps(out))
             return out
         except Exception as e:  # malformed JSON or a CLI failure: retry, then give up on this call
