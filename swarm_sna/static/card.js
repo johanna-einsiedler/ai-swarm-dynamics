@@ -11,6 +11,8 @@
   const pfmt = p => (p == null || isNaN(p)) ? "n/a" : p < 0.002 ? "p < 0.002" : "p = " + f3(p);
   const familyColour = f => { const i = D.family_order.indexOf(f); return i >= 0 && i < P.series.length ? P.series[i] : P.other; };
   const thin = new Set(D.groups.filter(g => g.thin).map(g => g.name));
+  const G = new Map(D.groups.map(g => [g.name, g]));
+  const glabel = name => { const g = G.get(name); return g && g.marker ? g.marker + " " + name : name; };  // "▲ era 2"
   const groupsShown = () => state.group === "all" ? D.groups.map(g => g.name) : [state.group];
   const width = (el, min) => Math.max(min || 320, el.clientWidth || 800);
 
@@ -68,7 +70,7 @@
     const groups = groupsShown().filter(g => N.table.some(r => r.group === g));
     if (!groups.length) return;
     const kinds = Object.keys(N.null_names);
-    const kind = el._null || kinds[0];
+    const kind = el._null || (kinds.includes(D.default_null) ? D.default_null : kinds[0]);
     const ctl = d3.select(el).append("div").attr("class", "ctl");
     ctl.append("span").attr("class", "ctl-label").text("null");
     ctl.selectAll("button").data(kinds).join("button").attr("class", k => "seg" + (k === kind ? " on" : "")).text(k => N.null_names[k])
@@ -85,7 +87,7 @@
         const x0 = left + c * colW, w = colW - 22, h = rowH - 32;
         const draws = N.draws && N.draws[kind] && N.draws[kind][s.key] && N.draws[kind][s.key][g];
         const cell = svg.append("g").attr("transform", `translate(${x0},${y0})`);
-        if (r === 0) cell.append("text").attr("y", -8).attr("fill", thin.has(g) ? P.muted : P.ink).attr("font-size", 11.5).attr("font-weight", 600).text(g + (thin.has(g) ? "  (thin)" : ""));
+        if (r === 0) cell.append("text").attr("y", -8).attr("fill", thin.has(g) ? P.muted : P.ink).attr("font-size", 11.5).attr("font-weight", 600).text(glabel(g) + (thin.has(g) ? "  (thin)" : ""));
         const lo = Math.min(row.null_lo, row.observed, draws ? d3.min(draws) : Infinity), hi = Math.max(row.null_hi, row.observed, draws ? d3.max(draws) : -Infinity);
         const pad = (hi - lo) * 0.1 || Math.max(Math.abs(hi) * 0.02, 0.005);  // a degenerate null (every draw equal) still gets a readable axis
         const x = d3.scaleLinear().domain([lo - pad, hi + pad]).range([0, w]);
@@ -124,7 +126,7 @@
     groups.forEach((g, i) => {
       const net = D.networks[g];
       const panel = svg.append("g").attr("transform", `translate(${(i % cols) * pw},${Math.floor(i / cols) * ph})`);
-      drawForce(panel, net.nodes, net.edges.map(e => ({ source: e.s, target: e.t, w: e.w })), pw, ph, `${g}  (${net.nodes.length} agents)` + (thin.has(g) ? " · thin" : ""), false,
+      drawForce(panel, net.nodes, net.edges.map(e => ({ source: e.s, target: e.t, w: e.w })), pw, ph, `${glabel(g)}  (${net.nodes.length} agents)` + (thin.has(g) ? " · thin" : ""), false,
         d => [["mentions received", int(Math.round(d.in))], ["mentions sent", int(Math.round(d.out))], ["messages", int(d.msgs)]], d => d.in);
     });
     familyLegend(el);
@@ -217,7 +219,7 @@
     periods.forEach((p, i) => {
       const e = L.era[p]; if (e == null || e === prevEra) return;
       if (prevEra !== null) strip.append("line").attr("x1", sx(i)).attr("x2", sx(i)).attr("y1", 0).attr("y2", sh - 14).attr("stroke", P.muted);
-      strip.append("text").attr("x", sx(i) + 3).attr("y", sh - 3).attr("fill", P.muted).attr("font-size", 10).text(`${D.group_label} ${e}`);
+      strip.append("text").attr("x", sx(i) + 3).attr("y", sh - 3).attr("fill", P.muted).attr("font-size", 10).text(glabel(`${D.group_label} ${e}`));
       prevEra = e;
     });
     strip.append("g").selectAll("rect").data(periods).join("rect").attr("x", (d, i) => sx(i)).attr("width", sx.step()).attr("y", 0).attr("height", sh).attr("fill", "transparent")
@@ -234,7 +236,7 @@
 
     function draw() {
       const lo = Math.max(0, T.i - T.win + 1), hi = T.i;
-      stamp.text(T.win === 1 ? "week of " + periods[hi] : `${periods[lo]} to ${periods[hi]}` + (L.era[periods[hi]] != null ? ` · ${D.group_label} ${L.era[periods[hi]]}` : ""));
+      stamp.text((T.win === 1 ? "week of " + periods[hi] : `${periods[lo]} to ${periods[hi]}`) + (L.era[periods[hi]] != null ? ` · ${glabel(`${D.group_label} ${L.era[periods[hi]]}`)}` : ""));
       winRect.attr("x", sx(lo)).attr("width", sx(hi) + sx.bandwidth() - sx(lo));
       bars.attr("fill", (d, i) => i === hi ? P.observed : P.null);
       const acc = new Map(), active = new Set(), msgs = new Map();
@@ -314,7 +316,7 @@
       const g = svg.append("g").attr("transform", `translate(${(k % cols) * pw},${Math.floor(k / cols) * ph})`);
       const rows = sizes.map(s => H.bystander.find(r => r.era === era && r.size === s)).filter(Boolean);
       const x = d3.scalePoint().domain(sizes).range([44, pw - 20]).padding(0.5), y = d3.scaleLinear().domain([0, 1]).range([ph - 40, 30]);
-      g.append("text").attr("x", 8).attr("y", 16).attr("font-size", 12).attr("font-weight", 600).attr("fill", P.ink).text(`${D.group_label} ${era}` + (thin.has(`${D.group_label} ${era}`) ? "  (thin)" : ""));
+      g.append("text").attr("x", 8).attr("y", 16).attr("font-size", 12).attr("font-weight", 600).attr("fill", P.ink).text(glabel(`${D.group_label} ${era}`) + (thin.has(`${D.group_label} ${era}`) ? "  (thin)" : ""));
       grid(g.append("g").attr("transform", "translate(44,0)"), y, 4, pw - 64, true);
       g.append("g").attr("transform", "translate(44,0)").call(d3.axisLeft(y).ticks(4).tickSize(3).tickFormat(pct)).call(axis);
       g.append("g").attr("transform", `translate(0,${ph - 40})`).call(d3.axisBottom(x).tickSize(3)).call(axis);
@@ -326,7 +328,7 @@
         if (pts.length) { const last = pts[pts.length - 1], v = last[col]; g.append("text").attr("x", x(last.size)).attr("y", v > 0.85 ? y(v) + 17 : y(v) - 9).attr("text-anchor", "middle").attr("font-size", 10.5).attr("fill", P.ink).text(pct(v)); }
       });
       g.selectAll(null).data(rows).join("rect").attr("x", r => x(r.size) - x.step() / 2).attr("y", 20).attr("width", x.step()).attr("height", ph - 60).attr("fill", "transparent")
-        .on("pointermove", (e, r) => showTip(e, `${D.group_label} ${era} · ${r.size} agents present`, series.map(([c, l, colour]) => [l, r[c] == null ? "n/a" : pct(r[c]), colour]).concat([["broadcast requests", int(r.requests)]]))).on("pointerleave", hideTip);
+        .on("pointermove", (e, r) => showTip(e, `${glabel(`${D.group_label} ${era}`)} · ${r.size} agents present`, series.map(([c, l, colour]) => [l, r[c] == null ? "n/a" : pct(r[c]), colour]).concat([["broadcast requests", int(r.requests)]]))).on("pointerleave", hideTip);
     });
     legend(el, series.map(([c, l, colour]) => [l, colour]), true);
   }
@@ -345,13 +347,13 @@
     grid(svg.append("g"), x, 5, h - 26, false);
     rows.forEach((r, i) => {
       const g = svg.append("g");
-      g.append("text").attr("x", left - 10).attr("y", y(i)).attr("text-anchor", "end").attr("dominant-baseline", "middle").attr("font-size", 12).attr("fill", thin.has(r.group) ? P.muted : P.ink).text(r.group);
+      g.append("text").attr("x", left - 10).attr("y", y(i)).attr("text-anchor", "end").attr("dominant-baseline", "middle").attr("font-size", 12).attr("fill", thin.has(r.group) ? P.muted : P.ink).text(glabel(r.group));
       g.append("line").attr("x1", x(r.null_lo)).attr("x2", x(r.null_hi)).attr("y1", y(i)).attr("y2", y(i)).attr("stroke", P.null).attr("stroke-width", 7).attr("stroke-linecap", "round");
       g.append("circle").attr("cx", x(r.null_mean)).attr("cy", y(i)).attr("r", 3).attr("fill", P.muted);
       g.append("circle").attr("cx", x(r.observed)).attr("cy", y(i)).attr("r", 5.5).attr("fill", P.observed).attr("stroke", "#fff").attr("stroke-width", 2);
       g.append("text").attr("x", x(Math.max(r.observed, r.null_hi)) + 10).attr("y", y(i)).attr("dominant-baseline", "middle").attr("font-size", 10.5).attr("fill", P.muted).text(pfmt(r.p));
       g.append("rect").attr("x", 0).attr("y", y(i) - rh / 2).attr("width", W).attr("height", rh).attr("fill", "transparent")
-        .on("pointermove", e => showTip(e, r.group, [["steepness", f3(r.observed), P.observed], ["null mean", f3(r.null_mean), P.null], ["null 95% band", `[${f3(r.null_lo)}, ${f3(r.null_hi)}]`], ["", pfmt(r.p)], ["directives", int(r.contests)], ["agents", int(r.agents)]])).on("pointerleave", hideTip);
+        .on("pointermove", e => showTip(e, glabel(r.group), [["steepness", f3(r.observed), P.observed], ["null mean", f3(r.null_mean), P.null], ["null 95% band", `[${f3(r.null_lo)}, ${f3(r.null_hi)}]`], ["", pfmt(r.p)], ["directives", int(r.contests)], ["agents", int(r.agents)]])).on("pointerleave", hideTip);
     });
     svg.append("g").attr("transform", `translate(0,${h - 26})`).call(d3.axisBottom(x).ticks(5).tickSize(3)).call(axis);
     svg.append("text").attr("x", W - 16).attr("y", h - 4).attr("text-anchor", "end").attr("font-size", 10.5).attr("fill", P.muted).text("steepness of the dominance hierarchy (0 flat, 1 linear)");
@@ -371,7 +373,7 @@
       const rows = per[k], left = 112;
       const g = svg.append("g").attr("transform", `translate(${(k % cols) * pw},${Math.floor(k / cols) * ph})`);
       const x = d3.scaleLinear().domain([0, xmax * 1.15]).range([left, pw - 16]);
-      g.append("text").attr("x", 8).attr("y", top + 10).attr("font-size", 12).attr("font-weight", 600).attr("fill", thin.has(gname) ? P.muted : P.ink).text(gname + (thin.has(gname) ? "  (thin)" : ""));
+      g.append("text").attr("x", 8).attr("y", top + 10).attr("font-size", 12).attr("font-weight", 600).attr("fill", thin.has(gname) ? P.muted : P.ink).text(glabel(gname) + (thin.has(gname) ? "  (thin)" : ""));
       rows.forEach((r, i) => {
         const y0 = top + 26 + i * (bh + gap);
         g.append("text").attr("x", left - 8).attr("y", y0 + bh / 2).attr("text-anchor", "end").attr("dominant-baseline", "middle").attr("font-size", 11).attr("fill", P.ink).text(r.agent.length > 16 ? r.agent.slice(0, 15) + "…" : r.agent);
@@ -407,7 +409,7 @@
       const xs = x(new Date(start));
       if (xs <= left + 1) return;  // the first group starts at the axis; a label there would sit on the panel title
       svg.append("line").attr("x1", xs).attr("x2", xs).attr("y1", 2).attr("y2", h - 24).attr("stroke", P.observed).attr("stroke-opacity", 0.6);
-      svg.append("text").attr("x", xs + 4).attr("y", h - 28).attr("font-size", 10).attr("fill", P.observed).text(`${D.group_label} ${era}`);
+      svg.append("text").attr("x", xs + 4).attr("y", h - 28).attr("font-size", 10).attr("fill", P.observed).text(glabel(`${D.group_label} ${era}`));
     });
     svg.append("g").attr("transform", `translate(0,${h - 24})`).call(d3.axisBottom(x).ticks(Math.min(8, Math.floor(W / 110))).tickSize(3)).call(axis);
     const cross = svg.append("line").attr("y1", 2).attr("y2", h - 24).attr("stroke", P.muted).attr("stroke-width", 1).style("display", "none");
@@ -418,7 +420,7 @@
         const [mx] = d3.pointer(e); const k = bisect(weeks, x.invert(mx)); const r = Tr.weekly[k]; const xs = x(weeks[k]);
         cross.style("display", null).attr("x1", xs).attr("x2", xs);
         dots.style("display", p => r[p.col] == null ? "none" : null).attr("cx", xs).attr("cy", p => r[p.col] == null ? 0 : p.y(r[p.col]));
-        showTip(e, "week of " + r.week + (r.era != null ? ` · ${D.group_label} ${r.era}` : ""), panels.map(p => [p.label, r[p.col] == null ? "n/a" : p.rate ? pct(r[p.col]) : d3.format(".2~f")(r[p.col])]).concat([["messages", int(r.messages)]]));
+        showTip(e, "week of " + r.week + (r.era != null ? ` · ${glabel(`${D.group_label} ${r.era}`)}` : ""), panels.map(p => [p.label, r[p.col] == null ? "n/a" : p.rate ? pct(r[p.col]) : d3.format(".2~f")(r[p.col])]).concat([["messages", int(r.messages)]]));
       })
       .on("pointerleave", () => { cross.style("display", "none"); dots.style("display", "none"); hideTip(); });
   }
@@ -505,7 +507,7 @@
   if (bar && D.groups.length > 1) {
     const b = d3.select(bar);
     b.append("span").attr("class", "ctl-label").text("show");
-    const opts = [{ name: "all", label: "all " + D.group_label + "s" }].concat(D.groups.map(g => ({ name: g.name, label: g.name, thin: g.thin, title: g.thin ? `${g.median_active} agents a day on average: too thin to judge` : `${g.median_active} agents a day on average` })));
+    const opts = [{ name: "all", label: "all " + D.group_label + "s" }].concat(D.groups.map(g => ({ name: g.name, label: glabel(g.name), thin: g.thin, title: g.thin ? `${g.median_active} agents a day on average: too thin to judge` : `${g.median_active} agents a day on average` })));
     b.selectAll("button").data(opts).join("button").attr("class", o => "seg" + (o.thin ? " thin" : "") + (o.name === state.group ? " on" : "")).attr("title", o => o.title || null).text(o => o.label)
       .on("click", function (e, o) { state.group = o.name; b.selectAll("button").classed("on", x => x.name === o.name); renderAll(true); });
   }

@@ -18,6 +18,8 @@ h3 { font-size: 14px; margin: 18px 0 6px; color: var(--muted); font-weight: 600;
 .chip { display:inline-block; font-size:12px; font-weight:600; padding:1px 9px; border-radius:99px; white-space:nowrap; }
 .chip.above { background:var(--above-bg); color:#174e91; } .chip.below { background:var(--below-bg); color:#8a2f0a; }
 .chip.within, .chip.unknown, .chip.info, .chip.mixed { background:var(--within-bg); color:#3d4450; }
+.chip.yes { background:var(--above-bg); color:#174e91; } .chip.no { background:var(--within-bg); color:#3d4450; } .chip.no.below { background:var(--below-bg); color:#8a2f0a; }
+.verdict .chip { margin-right:2px; }
 .chip.thin { background:transparent; color:var(--muted); border:1px dashed var(--line); font-weight:500; }
 .glance { list-style:none; padding:0; margin:0; } .glance li { padding:7px 0; border-top:1px solid var(--line); display:flex; gap:10px; align-items:baseline; }
 .glance li:first-child { border-top:0; } .glance a { color:var(--ink); text-decoration:none; flex: 0 0 43%; font-weight:600; } .glance a:hover { text-decoration:underline; }

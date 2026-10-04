@@ -8,10 +8,10 @@ set -e
 .venv/bin/swarm-sna hierarchy out/village --by era --permutations 1000
 .venv/bin/swarm-sna trends out/village
 .venv/bin/swarm-sna diffusion out/village --permutations 1000
-.venv/bin/swarm-sna card out/village --title "AI Village"
+.venv/bin/swarm-sna card out/village --title "AI Village" --intro meta/intro.md
 .venv/bin/swarm-sna diffusion out/toy --permutations 300
 .venv/bin/swarm-sna card out/toy --title "Toy swarm (synthetic, 8 agents)"
 mkdir -p examples/village-results
-cp out/village/report_card.html out/village/*.png out/village/report_era.csv out/village/report_era_draws.json out/village/helping_*.csv out/village/hierarchy_*.csv out/village/trends_*.csv out/village/goal_alignment*.csv out/village/diffusion_summary.csv out/village/diffusion_leaders.csv out/village/diffusion_correlates.csv out/village/diffusion_items.csv out/village/diffusion_edges.csv out/village/association_hwi.csv examples/village-results/
+cp out/village/report_card.html out/village/*.png out/village/report_era.csv out/village/report_era_draws.json out/village/helping_*.csv out/village/helping_summary.json out/village/hierarchy_*.csv out/village/trends_*.csv out/village/goal_alignment*.csv out/village/diffusion_summary.csv out/village/diffusion_leaders.csv out/village/diffusion_correlates.csv out/village/diffusion_items.csv out/village/diffusion_edges.csv out/village/association_hwi.csv examples/village-results/
 cp out/toy/report_card.html examples/toy/report_card.html
 ls -la examples/village-results | awk '{print $5, $9}'
