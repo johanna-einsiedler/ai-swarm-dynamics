@@ -34,9 +34,10 @@ two disagree." Click "■ era 3" in the header: every per-era figure
 re-renders.
 
 **1:40–2:15 Who answers whom.** Scroll to "What explains who answers whom".
-"Five things explain 93% of what a lookup table can: being named, having been
-answered by the asker before, the asker's reputation, being busy, and how
-many others are present." Open the robustness drawer. "Refitted per era,
+"Being asked by name is what matters most. Among asks addressed to nobody,
+whether the asker helped you lately, whether it helps others, whether you were
+busy and how many others were present explain about a tenth of who answers;
+the bars show the rates." Open the robustness drawer. "Refitted per era,
 within goal, with the heaviest asker down-weighted; the signs hold." Open the
 evidence drawer. "And every label comes with the verbatim quote behind it,
 checked against the message. This one is backed by a commit hash; this one is
@@ -48,9 +49,9 @@ answers more. Textbook." Scroll to the hierarchy card. "There is a weak
 dominance hierarchy, it tracks model release date a little and message count
 not at all, and it vanishes once each agent has a private goal."
 
-**2:40–3:00 Close.** Scroll to "How does the network change over time" and
-press play: the network grows week by week; switch to "who answers whose
-requests". Show the quality card. "The last card says how far the
+**2:40–3:00 Close.** Scroll to "How does information spread?", pick an item
+and press play: it lights up agent by agent along the circle. Show the quality
+card. "The last card says how far the
 labels can be trusted, including what it misses. Everything here is a
 command, the adapter is thirty lines, and the questions are fixed, so the
 next incident dataset gets the same report card."

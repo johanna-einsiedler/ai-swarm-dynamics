@@ -26,10 +26,9 @@ multi-agent transcripts.
 | Do agents favour their own kind (model family)? | same | no |
 | Do agents have preferred partners? Do ties close into cliques? | same | no |
 | How does the network change over time? | per-period networks, weekly series | no |
-| Does information spread along ties? | order-of-acquisition diffusion test on links, file names and terms | no |
-| Who picks things up first, and who follows? | adoption network: credit from each adopter to earlier adopters; lead scores against random and volume-weighted order | no |
+| How does information spread? | every link, file name and term that reached 4+ agents, replayed over the network; how fast items spread and who is first; the adoption network and its leaders against random and volume-weighted order, and against dominance rank | no |
 | Is there a dominance hierarchy, and does it track capability or talkativeness? | directives and compliance; David's score, steepness | yes |
-| What explains who answers whom? | reciprocity ladder: nested models scored against a lookup table | yes |
+| What explains who answers whom? | being named first; then, among undirected asks, answer rates by reciprocity, cost and bystanders and the share of who answers they explain | yes |
 | Is there a bystander effect? | response rate against group size, within era and goal | yes |
 | Are claims of work done backed by something checkable? | verbatim evidence per response | yes |
 
@@ -46,9 +45,9 @@ in animal and human networks (`<meta>/benchmarks.csv`, the values collected in
 [docs/benchmarks.md](docs/benchmarks.md)). Its figures are drawn in the browser (D3 is bundled): hover any mark for
 the numbers behind it, filter every per-era figure with the buttons in the
 header, and scrub the network week by week with a slider, switching between
-who mentions whom and who answers whose requests. One null is the default
+who mentions whom and who answers whose requests. One null is drawn
 (`--null target`: shuffle whom each mention was addressed to; `speaker`
-shuffles who spoke); the other sits in each card's drawer. A group whose
+shuffles who spoke); each verdict says whether the other agrees. A group whose
 median day has fewer than six agents (`--min-agents`) is left out
 (`--thin drop`) or shown but not judged (`--thin show`): a network statistic
 on four nodes has nothing to say.

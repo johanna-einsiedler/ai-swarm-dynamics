@@ -198,6 +198,13 @@ def _spearman(x, y):
 
 
 ITEM_COLUMNS = ["item", "adopters", "first_adopter", "first", "spread_days", "observed", "null_mean", "null_sd", "z", "p"]
+FILE_EXT = re.compile(r"\.(?:py|js|ts|md|json|csv|yaml|yml|sh|html|txt|ipynb)$")
+HOST = re.compile(r"^[a-z0-9.\-]+\.[a-z]{2,}(?:/|$)")
+
+
+def item_kind(item):
+    """link (a host, maybe with a path), file (a name with an extension) or term (a backticked token)."""
+    return "file" if FILE_EXT.search(item) else "link" if HOST.match(item) else "term"
 
 
 def _nothing(in_dir, why):
@@ -221,6 +228,9 @@ def run(in_dir, n_perm=N_PERM, seed=0):
     print(f"{len(fu):,} first uses of {fu.item.nunique():,} tokens; {len(items)} items with {MIN_ADOPTERS}-{MAX_ADOPTERS} adopters spread over {MIN_SPREAD_DAYS}-{MAX_SPREAD_DAYS} days")
     if items.empty:
         return _nothing(in_dir, "no token spread to enough agents to test")
+    # Every adoption of every selected item, in order: the card replays them and reads the general patterns off them.
+    ad = fu[fu.item.isin(items.index)].sort_values(["item", "ts"])
+    ad.assign(kind=ad.item.map(item_kind)).to_csv(in_dir / "diffusion_adoptions.csv", index=False)
     rng = np.random.default_rng(seed)
     rows = []
     for item, meta in items.iterrows():
@@ -283,4 +293,4 @@ def run(in_dir, n_perm=N_PERM, seed=0):
     figures.leaders(lead, in_dir / "fig_diffusion_leaders.png")
     summary.update(network_items=n_items, steepness=steep, steepness_random_null=u_mu, steepness_random_p=u_p, steepness_volume_null=s_mu, steepness_volume_p=s_p)
     pd.DataFrame([summary]).to_csv(in_dir / "diffusion_summary.csv", index=False)
-    print(f"\nwrote {in_dir}/diffusion_items.csv, diffusion_leaders.csv, diffusion_edges.csv, diffusion_correlates.csv, diffusion_summary.csv, fig_diffusion.png, fig_diffusion_leaders.png")
+    print(f"\nwrote {in_dir}/diffusion_items.csv, diffusion_adoptions.csv, diffusion_leaders.csv, diffusion_edges.csv, diffusion_correlates.csv, diffusion_summary.csv, fig_diffusion.png, fig_diffusion_leaders.png")

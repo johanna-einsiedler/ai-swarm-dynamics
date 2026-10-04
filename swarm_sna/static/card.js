@@ -71,10 +71,12 @@
     if (!groups.length) return;
     const kinds = Object.keys(N.null_names);
     const kind = el._null || (kinds.includes(D.default_null) ? D.default_null : kinds[0]);
-    const ctl = d3.select(el).append("div").attr("class", "ctl");
-    ctl.append("span").attr("class", "ctl-label").text("null");
-    ctl.selectAll("button").data(kinds).join("button").attr("class", k => "seg" + (k === kind ? " on" : "")).text(k => N.null_names[k])
-      .on("click", (e, k) => { el._null = k; el.replaceChildren(); nulls(el); });
+    if (kinds.length > 1) {
+      const ctl = d3.select(el).append("div").attr("class", "ctl");
+      ctl.append("span").attr("class", "ctl-label").text("null");
+      ctl.selectAll("button").data(kinds).join("button").attr("class", k => "seg" + (k === kind ? " on" : "")).text(k => N.null_names[k])
+        .on("click", (e, k) => { el._null = k; el.replaceChildren(); nulls(el); });
+    }
     const W = width(el), left = 112, top = 22, rowH = 104;
     const colW = Math.max(150, (W - left) / groups.length);
     const svg = svgIn(el, W, top + rowH * N.stats.length);
@@ -488,8 +490,149 @@
     if (cut) note(el, `The fifteen most leading and fifteen most following of ${Df.leaders.length} agents; the drawer below lists them all.`);
   }
 
+  // ---- answer rates among undirected asks, by each factor
+  function help_rates(el) {
+    const U = D.helping && D.helping.undirected; if (!U) return;
+    const factors = Array.from(new Set(U.rates.map(r => r.factor)));
+    const W = width(el), cols = W >= 700 ? 4 : 2, pw = W / cols, bh = 16, gap = 10, left = 76;
+    const rows = factors.map(f => U.rates.filter(r => r.factor === f));
+    const ph = 52 + d3.max(rows, r => r.length) * (bh + gap) + 20;
+    const svg = svgIn(el, W, ph * Math.ceil(factors.length / cols));
+    const xmax = d3.max(U.rates, r => r.rate) || 0.1;
+    factors.forEach((f, k) => {
+      const g = svg.append("g").attr("transform", `translate(${(k % cols) * pw},${Math.floor(k / cols) * ph})`);
+      const x = d3.scaleLinear().domain([0, xmax * 1.3]).range([left, pw - 14]);
+      g.append("text").attr("x", 8).attr("y", 14).attr("font-size", 12).attr("font-weight", 600).attr("fill", P.ink).text(f);
+      wrap(rows[k][0].label, Math.floor(pw / 6.5)).forEach((line, i) => g.append("text").attr("x", 8).attr("y", 28 + i * 12).attr("font-size", 10.5).attr("fill", P.muted).text(line));
+      const top = 52;
+      g.append("line").attr("x1", x(U.rate)).attr("x2", x(U.rate)).attr("y1", top - 4).attr("y2", top + rows[k].length * (bh + gap) - gap + 4).attr("stroke", P.axis);
+      rows[k].forEach((r, i) => {
+        const y0 = top + i * (bh + gap);
+        g.append("text").attr("x", left - 6).attr("y", y0 + bh / 2).attr("text-anchor", "end").attr("dominant-baseline", "middle").attr("font-size", 11).attr("fill", P.ink).text(r.level);
+        endBar(g, x(0), x(r.rate), y0, bh).attr("fill", P.series[0]);
+        g.append("text").attr("x", x(r.rate) + 5).attr("y", y0 + bh / 2).attr("dominant-baseline", "middle").attr("font-size", 10.5).attr("fill", P.ink).text(pct(r.rate));
+        g.append("rect").attr("x", 0).attr("y", y0 - gap / 2).attr("width", pw).attr("height", bh + gap).attr("fill", "transparent")
+          .on("pointermove", e => showTip(e, `${f}: ${r.level}`, [["a given agent answers", pct(r.rate), P.series[0]], ["ask-agent pairs", int(r.n)]])).on("pointerleave", hideTip);
+      });
+    });
+    note(el, `The share of undirected asks a given agent present answers, by each factor; the grey line is the overall rate, ${pct(U.rate)}.`);
+  }
+
+  // ---- diffusion: items by how many agents picked them up, and how fast an item reaches its adopters
+  function diffusion_patterns(el) {
+    const A = D.diffusion && D.diffusion.adoptions; if (!A) return;
+    const W = width(el), two = W >= 640, pw = two ? W / 2 : W, h = 250;
+    const svg = svgIn(el, W, two ? h : 2 * h);
+    const kinds = ["link", "file", "term"].filter(k => A.kinds[k]);
+    const kc = Object.fromEntries(kinds.map((k, i) => [k, P.series[i]]));
+    const g1 = svg.append("g");
+    const counts = d3.rollup(A.items, v => v.length, d => d.adopters, d => d.kind);
+    const ns = Array.from(counts.keys()).sort((a, b) => a - b);
+    const x1 = d3.scaleBand().domain(ns).range([44, pw - 14]).paddingInner(0.15);
+    const y1 = d3.scaleLinear().domain([0, d3.max(ns, n => d3.sum(kinds, k => counts.get(n).get(k) || 0)) || 1]).range([h - 36, 24]);
+    grid(g1.append("g").attr("transform", "translate(44,0)"), y1, 4, pw - 58, true);
+    ns.forEach(n => {
+      let acc = 0;
+      kinds.forEach(k => {
+        const c = counts.get(n).get(k) || 0; if (!c) return;
+        g1.append("rect").attr("x", x1(n)).attr("width", x1.bandwidth()).attr("y", y1(acc + c)).attr("height", Math.max(0, y1(acc) - y1(acc + c) - 1)).attr("fill", kc[k])
+          .on("pointermove", e => showTip(e, `${n} adopters`, kinds.map(kk => [kk + "s", int(counts.get(n).get(kk) || 0), kc[kk]]))).on("pointerleave", hideTip);
+        acc += c;
+      });
+    });
+    g1.append("g").attr("transform", "translate(44,0)").call(d3.axisLeft(y1).ticks(4).tickSize(3)).call(axis);
+    g1.append("g").attr("transform", `translate(0,${h - 36})`).call(d3.axisBottom(x1).tickSize(3).tickValues(ns.filter((n, i) => ns.length <= 10 || i % 2 === 0))).call(axis);
+    g1.append("text").attr("x", 44).attr("y", 14).attr("font-size", 11).attr("font-weight", 600).attr("fill", P.ink).text("items, by how many agents picked them up");
+    g1.append("text").attr("x", pw - 14).attr("y", h - 8).attr("text-anchor", "end").attr("font-size", 10.5).attr("fill", P.muted).text("agents that adopted the item");
+    const g2 = svg.append("g").attr("transform", two ? `translate(${pw},0)` : `translate(0,${h})`);
+    const x2 = d3.scaleLinear().domain([0, 30]).range([44, pw - 14]), y2 = d3.scaleLinear().domain([0, 1]).range([h - 36, 24]);
+    const c = A.curve.filter(p => p.day <= 30);
+    grid(g2.append("g").attr("transform", "translate(44,0)"), y2, 4, pw - 58, true);
+    g2.append("path").datum(c).attr("fill", P.series[0]).attr("fill-opacity", 0.12).attr("d", d3.area().x(p => x2(p.day)).y0(p => y2(p.lo)).y1(p => y2(p.hi)));
+    g2.append("path").datum(c).attr("fill", "none").attr("stroke", P.series[0]).attr("stroke-width", 2).attr("d", d3.line().x(p => x2(p.day)).y(p => y2(p.median)));
+    g2.append("g").attr("transform", "translate(44,0)").call(d3.axisLeft(y2).ticks(4).tickSize(3).tickFormat(pct)).call(axis);
+    g2.append("g").attr("transform", `translate(0,${h - 36})`).call(d3.axisBottom(x2).ticks(6).tickSize(3)).call(axis);
+    g2.append("text").attr("x", 44).attr("y", 14).attr("font-size", 11).attr("font-weight", 600).attr("fill", P.ink).text("share of an item's adopters reached");
+    g2.append("text").attr("x", pw - 14).attr("y", h - 8).attr("text-anchor", "end").attr("font-size", 10.5).attr("fill", P.muted).text("days since the first use (median item, quartile band)");
+    const bis = d3.bisector(p => p.day).center;
+    g2.append("rect").attr("x", 44).attr("y", 20).attr("width", pw - 58).attr("height", h - 56).attr("fill", "transparent")
+      .on("pointermove", e => { const [mx] = d3.pointer(e); const p = c[bis(c, x2.invert(mx))]; showTip(e, `${p.day} days after the first use`, [["the median item has reached", pct(p.median), P.series[0]], ["quartiles", `${pct(p.lo)} to ${pct(p.hi)}`]]); }).on("pointerleave", hideTip);
+    legend(el, kinds.map(k => [k + "s", kc[k]]));
+  }
+
+  // ---- watch one item spread over the circle of agents
+  const R = { item: null, step: null, timer: null };
+  function diffusion_run(el) {
+    const A = D.diffusion && D.diffusion.adoptions, L = D.timeline; if (!A || !L || !A.items.length) return;
+    const agents = L.agents, n = agents.length;
+    if (!R.item || !A.seq[R.item]) { R.item = A.items[0].item; R.step = null; }
+    const ctl = d3.select(el).append("div").attr("class", "ctl");
+    ctl.append("span").attr("class", "ctl-label").text("item");
+    const stop = () => { if (R.timer) clearInterval(R.timer); R.timer = null; play.text("play"); };
+    const sel = ctl.append("select").on("change", function () { R.item = this.value; R.step = null; stop(); draw(); });
+    sel.selectAll("option").data(A.items).join("option").attr("value", d => d.item).property("selected", d => d.item === R.item).text(d => `${d.item}  (${d.kind}, ${d.adopters} agents, ${d.days} days)`);
+    const play = ctl.append("button").attr("class", "seg").text("play").on("click", () => {
+      if (R.timer) { stop(); return; }
+      R.step = 0; draw(); play.text("pause");
+      R.timer = setInterval(() => { if (R.step >= A.seq[R.item].length) { stop(); return; } R.step += 1; draw(); }, 800);
+    });
+    const stamp = ctl.append("span").attr("class", "stamp");
+    const slider = d3.select(el).append("input").attr("type", "range").attr("class", "slider").attr("min", 0).on("input", function () { R.step = +this.value; stop(); draw(); });
+    const tie = new Map();  // mentions over the whole record, between pairs of agents
+    Object.values(L.mentions).forEach(list => list.forEach(([s, t, w]) => { const k = Math.min(s, t) * n + Math.max(s, t); tie.set(k, (tie.get(k) || 0) + w); }));
+    const W = width(el), size = Math.min(W, 560), cx = W / 2, cy = size / 2, Rr = size / 2 - 64;
+    const svg = svgIn(el, W, size);
+    const angle = i => Math.PI / 2 - 2 * Math.PI * i / n, xy = i => [cx + Rr * Math.cos(angle(i)), cy - Rr * Math.sin(angle(i))];
+    svg.append("circle").attr("cx", cx).attr("cy", cy).attr("r", Rr).attr("fill", "none").attr("stroke", P.faint);
+    const edgeLayer = svg.append("g"), nodeLayer = svg.append("g"), labelLayer = svg.append("g");
+    const list = d3.select(el).append("ol").attr("class", "runlist");
+    function draw() {
+      const seq = A.seq[R.item];
+      if (R.step === null) R.step = seq.length;
+      const k = Math.min(R.step, seq.length), have = seq.slice(0, k);
+      slider.attr("max", seq.length).property("value", k);
+      stamp.text(k ? `day ${d3.format(".1f")(have[k - 1][1])} · ${k} of ${seq.length} agents` : `${seq.length} agents will pick it up`);
+      const edges = [];
+      have.forEach((a, i) => have.slice(i + 1).forEach(b => { const w = tie.get(Math.min(a[0], b[0]) * n + Math.max(a[0], b[0])); if (w) edges.push({ s: a[0], t: b[0], w }); }));
+      const wmax = d3.max(edges, e => e.w) || 1;
+      const path = e => { const a = xy(e.s), b = xy(e.t), m = [(a[0] + b[0]) / 2 * 0.35 + cx * 0.65, (a[1] + b[1]) / 2 * 0.35 + cy * 0.65]; return `M${a[0]},${a[1]} Q${m[0]},${m[1]} ${b[0]},${b[1]}`; };
+      edgeLayer.selectAll("path").data(edges, e => e.s + "-" + e.t).join("path").attr("d", path).attr("fill", "none").attr("stroke", P.ink).attr("stroke-linecap", "round").attr("stroke-opacity", e => 0.1 + 0.5 * e.w / wmax).attr("stroke-width", e => 0.5 + 2.5 * e.w / wmax);
+      const order = new Map(have.map((s, i) => [s[0], i]));
+      nodeLayer.selectAll("circle").data(agents.map((a, i) => ({ i, id: a.id, family: a.family })), d => d.i).join("circle").attr("cx", d => xy(d.i)[0]).attr("cy", d => xy(d.i)[1])
+        .attr("r", d => order.has(d.i) ? (order.get(d.i) === k - 1 ? 11 : 7) : 2.5).attr("fill", d => order.has(d.i) ? familyColour(d.family) : "#fff").attr("stroke", d => order.has(d.i) ? "#fff" : P.axis).attr("stroke-width", d => order.has(d.i) ? 2 : 1);
+      labelLayer.selectAll("text").data(have.map(s => s[0]), d => d).join("text").each(function (i) {
+        const deg = (angle(i) * 180 / Math.PI) % 360, flip = deg > 90 && deg < 270 || deg < -90;
+        d3.select(this).attr("transform", `translate(${xy(i)[0]},${xy(i)[1]}) rotate(${flip ? -deg + 180 : -deg})`).attr("x", flip ? -15 : 15).attr("text-anchor", flip ? "end" : "start").attr("dominant-baseline", "middle").attr("font-size", 10).attr("fill", P.ink).text(`${order.get(i) + 1}. ${agents[i].id}`);
+      });
+      list.selectAll("li").data(seq).join("li").attr("class", (s, i) => i < k ? "on" : null).text((s, i) => `${agents[s[0]].id} · day ${d3.format(".1f")(s[1])}`);
+    }
+    draw();
+    familyLegend(el);
+  }
+
+  // ---- lead score in adoption against David's score in the hierarchy
+  function lead_vs_rank(el) {
+    const LR = D.diffusion && D.diffusion.lead_rank; if (!LR) return;
+    const W = width(el), h = 300, left = 50;
+    const svg = svgIn(el, W, h);
+    const ext = d3.extent(LR.points, p => p.rank), pad = (ext[1] - ext[0]) * 0.15 || 1;  // David's scores sit well above zero; show their spread
+    const x = d3.scaleLinear().domain([-1, 1]).range([left, W - 16]), y = d3.scaleLinear().domain([ext[0] - pad, ext[1] + pad]).range([h - 40, 16]);
+    grid(svg.append("g").attr("transform", `translate(${left},0)`), y, 4, W - left - 16, true);
+    svg.append("line").attr("x1", x(0)).attr("x2", x(0)).attr("y1", 16).attr("y2", h - 40).attr("stroke", P.muted);
+    svg.append("g").attr("transform", `translate(${left},0)`).call(d3.axisLeft(y).ticks(4).tickSize(3)).call(axis);
+    svg.append("g").attr("transform", `translate(0,${h - 40})`).call(d3.axisBottom(x).ticks(4).tickSize(3).tickFormat(d3.format("+.1f"))).call(axis);
+    svg.append("text").attr("x", W - 16).attr("y", h - 8).attr("text-anchor", "end").attr("font-size", 10.5).attr("fill", P.muted).text("lead score in adoption: +1 always first, −1 always after others");
+    svg.append("text").attr("x", 4).attr("y", 12).attr("font-size", 10.5).attr("fill", P.muted).text("David's score");
+    svg.append("g").selectAll("circle").data(LR.points).join("circle").attr("cx", p => x(p.lead)).attr("cy", p => y(p.rank)).attr("r", 5.5).attr("fill", p => familyColour(p.family)).attr("stroke", "#fff").attr("stroke-width", 2);
+    const sorted = LR.points.slice().sort((a, b) => b.lead - a.lead), named = new Set(sorted.slice(0, 3).concat(sorted.slice(-3)).map(p => p.agent));
+    svg.append("g").selectAll("text").data(LR.points.filter(p => named.has(p.agent))).join("text").attr("x", p => Math.min(W - 70, x(p.lead) + 7)).attr("y", p => y(p.rank) - 6).attr("font-size", 10).attr("fill", P.ink).text(p => p.agent);
+    svg.append("g").selectAll("circle").data(LR.points).join("circle").attr("cx", p => x(p.lead)).attr("cy", p => y(p.rank)).attr("r", 12).attr("fill", "transparent")
+      .on("pointermove", (e, p) => showTip(e, p.agent + " · " + p.family, [["lead score", d3.format("+.2f")(p.lead), familyColour(p.family)], ["David's score", f2(p.rank)], ["messages", int(p.messages)]])).on("pointerleave", hideTip);
+    familyLegend(el);
+  }
+
   // ---- wiring
-  const RENDER = { nulls, network, timeline, ladder, bystander, hierarchy, ranks, trends, diffusion_items, diffusion_network, leaders };
+  const RENDER = { nulls, network, timeline, ladder, bystander, hierarchy, ranks, trends, diffusion_items, diffusion_network, leaders, help_rates, diffusion_patterns, diffusion_run, lead_vs_rank };
   function renderAll(groupedOnly) {
     document.querySelectorAll(".fig").forEach(el => {
       if (groupedOnly && !el.dataset.groups) return;

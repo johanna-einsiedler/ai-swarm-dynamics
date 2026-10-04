@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from .figures import FAINT, INK, MUTED, NAMED_FAMILIES, NULL_FILL, OBSERVED, OTHER, SERIES
-from .helping import SIZE_LABELS, helpful
+from .helping import SIZE_BINS, SIZE_LABELS, helpful, logit_fit
 from .report import LABELS as STAT_LABELS
 from .trends import SERIES as TREND_SERIES
 
@@ -292,8 +292,24 @@ def null_text(n_perm, null):
     other = [k for k in NULL_NAMES if k != null][0]
     return (
         f'<p class="meaning">Every verdict on this card is observed against a null model: the raw event stream is shuffled {n_perm:,} times within room and day and the statistic is recomputed on each shuffle. '
-        f"The default shuffle is <b>{NULL_NAMES[null]}</b>, which {NULL_MEANING[null]}. The other shuffle, {NULL_NAMES[other]}, is in each card's drawer and behind the toggle below. A pattern counts only if it beats the shuffles.</p>"
+        f"The shuffle is <b>{NULL_NAMES[null]}</b>, which {NULL_MEANING[null]}. A pattern counts only if it beats the shuffle. A second shuffle, {NULL_NAMES[other]}, {NULL_MEANING[other]}; each verdict says whether it agrees.</p>"
     )
+
+
+def _robust(main, alt, null, lab):
+    """One sentence on whether the other shuffle gives the same yes-or-no answers."""
+    if alt.empty:
+        return ""
+    other = [k for k in NULL_NAMES if k != null][0]
+    differ = []
+    for r in main.itertuples():
+        a = alt[alt.group == r.group]
+        if len(a) and (a.outcome.iloc[0] == "above") != (r.outcome == "above"):
+            differ.append((r.group, a.outcome.iloc[0]))
+    if not differ:
+        return f" The other shuffle, {NULL_NAMES[other]}, gives the same answer."
+    reading = "the pattern is more than partner choice but not more than who talks how much" if null == "target" else "the pattern is more than who talks how much but not more than partner choice"
+    return f" The other shuffle, {NULL_NAMES[other]}, answers differently in " + " and ".join(f"{lab(g)} ({WORD[o]})" for g, o in differ) + f": {reading}."
 
 
 def network_cards(d, group, lab, drop, thin, null, n_perm, bench):
@@ -311,7 +327,7 @@ def network_cards(d, group, lab, drop, thin, null, n_perm, bench):
         judged = main[~main.thin]
         parts = [f"{_answer(lab(r.group), r.outcome == 'above', r.outcome)} &ndash; {WORD[r.outcome]}, {r.observed:.3f} against {r.null_mean:.3f} expected ({_p(r.p)})." for r in judged.itertuples()]
         verdict = " ".join(parts) if parts else _chip("unknown") + " No group left to judge."
-        verdict += _thin_note(thin, main.group, lab)
+        verdict += _robust(judged, alt, null, lab) + _thin_note(thin, main.group, lab)
 
         def rows(x):
             return pd.DataFrame(
@@ -326,9 +342,6 @@ def network_cards(d, group, lab, drop, thin, null, n_perm, bench):
             body += null_text(n_perm, null) + _fig("nulls", grouped=True)
         if i == 2:
             body += _fig("network", grouped=True)
-        if len(alt):
-            note = f'<p class="meaning">{esc(NULL_NAMES[other].capitalize())} {esc(NULL_MEANING[other])}. The two shuffles can disagree: a pattern can beat partner choice yet be explained by who talks how much, or the reverse.</p>'
-            body += _drawer(f"Under the other shuffle ({NULL_NAMES[other]})", note + _table(rows(alt), raw=("p", ""), classes=["thin" if th else "" for th in alt.thin]))
         agents_line = ""
         if stat == "same_family_share" and len(judged):  # the human rows are observed over expected, so say ours the same way
             agents_line = "Written the human way, cross-family mentions run at " + ", ".join(f"{(1 - r.observed) / (1 - r.null_mean):.0%} of chance in {lab(r.group)}" for r in judged.itertuples()) + "."
@@ -400,7 +413,50 @@ def _exchange(r):
     )
 
 
-def helping_cards(d, group, lab, drop, bench):
+FACTORS = [  # the four things that could explain who answers an ask addressed to nobody in particular
+    ("direct reciprocity", "the asker answered this agent in the last 7 days"),
+    ("indirect reciprocity", "the asker answered others in the last 7 days"),
+    ("cost", "the agent was busy in a work session"),
+    ("bystanders", "how many agents were active in the room that day"),
+]
+
+
+def undirected_asks(d, group, drop):
+    """Among asks addressed to nobody in particular: the answer rate by each factor, and the share of the
+    uncertainty about who answers that each factor explains (McFadden's R-squared of a logistic model)."""
+    p = d / "dyads.parquet"
+    if not p.exists():
+        return None
+    dy = pd.read_parquet(p)
+    dy = dy[dy.broadcast & ~dy.era.map(lambda e: f"{group} {e}").isin(drop)]
+    if len(dy) < 200 or dy.responded.nunique() < 2:
+        return None
+    y = dy.responded.to_numpy(float)
+    F = pd.DataFrame({"direct reciprocity": np.log1p(dy.prior_help_from_requester), "indirect reciprocity": np.log1p(dy.requester_reputation), "cost": dy.responder_busy.astype(float), "bystanders": np.log(dy.active_n.clip(lower=1))})
+
+    def loss(cols):
+        X = np.c_[np.ones(len(dy)), F[cols].to_numpy()]
+        q = np.clip(1 / (1 + np.exp(-X @ logit_fit(X, y))), 1e-6, 1 - 1e-6)
+        return -(y * np.log(q) + (1 - y) * np.log(1 - q)).mean()
+
+    base = loss([])
+    r2 = {c: 1 - loss([c]) / base for c in F.columns}
+    r2["all four"] = 1 - loss(list(F.columns)) / base
+    levels = {
+        "direct reciprocity": (dy.prior_help_from_requester > 0).map({False: "no", True: "yes"}),
+        "indirect reciprocity": pd.cut(dy.requester_reputation, [-1, 0, 4, np.inf], labels=["0 answers", "1 to 4", "5 or more"]).astype(str),
+        "cost": dy.responder_busy.map({False: "not busy", True: "busy"}),
+        "bystanders": pd.cut(dy.active_n, SIZE_BINS, labels=SIZE_LABELS).astype(str),
+    }
+    rates = []
+    for factor, label in FACTORS:
+        g = dy.groupby(levels[factor].to_numpy()).responded.agg(["mean", "size"])
+        order = {"direct reciprocity": ["no", "yes"], "indirect reciprocity": ["0 answers", "1 to 4", "5 or more"], "cost": ["not busy", "busy"], "bystanders": list(SIZE_LABELS)}[factor]
+        rates += [{"factor": factor, "label": label, "level": lv, "rate": float(g.loc[lv, "mean"]), "n": int(g.loc[lv, "size"])} for lv in order if lv in g.index]
+    return {"n": int(len(dy)), "requests": int(dy.request_id.nunique()), "rate": float(y.mean()), "r2": {k: float(v) for k, v in r2.items()}, "rates": rates}
+
+
+def helping_cards(d, group, lab, drop, bench, und):
     t1, a1, t2, a2 = "What explains who answers whom?", "helping", "Is there a bystander effect?", "bystander"
     if not (d / "helping_ladder.csv").exists():
         return [_missing(t1, "swarm-sna label, then helping", a1), _missing(t2, "swarm-sna label, then helping", a2)]
@@ -408,12 +464,26 @@ def helping_cards(d, group, lab, drop, bench):
     summary = json.loads((d / "helping_summary.json").read_text()) if (d / "helping_summary.json").exists() else {}
     rungs = ladder[ladder.model != "no covariates"]
     first, last = rungs.iloc[0], rungs.iloc[-2]
-    verdict = f"Being addressed by name reaches <b>{first.completeness:.0%}</b> of what a lookup table can explain; adding reciprocity, cost and bystanders reaches <b>{last.completeness:.0%}</b> [{last.ci_lo:.0%}, {last.ci_hi:.0%}]."
     rows = pd.DataFrame({"model": rungs.model, "adds": rungs.model.map(LADDER_NOTE), "log loss": rungs.log_loss, "completeness": rungs.completeness, "95% CI": [f"[{a:.2f}, {b:.2f}]" for a, b in zip(rungs.ci_lo, rungs.ci_hi)]})
-    body = '<p class="meaning">A ladder of explanations, each adding one thing to the ones before: was the request addressed to you, has the asker helped you lately (direct reciprocity), does the asker help others (indirect reciprocity), were you busy (cost), how many others were present (bystanders). One row per request and agent present; nested logistic models, scored out of sample (held out by responder). Completeness is how much of the gain a lookup table of every covariate combination achieves over the base rate each rung reaches: 1 means nothing in these covariates is left unexplained.</p>'
-    if summary:
-        body += f'<p class="meaning">{summary["requests"]:,} requests, {summary["dyad_rows"]:,} request-agent pairs, all eras. An agent addressed by name answers {summary["addressed_rate"]:.0%} of the time; one not addressed, {summary["not_addressed_rate"]:.0%}.</p>'
-    body += _fig("ladder") + _table(rows, {"log loss": ".4f", "completeness": ".2f"})
+    named = f' An agent addressed by name answers {summary["addressed_rate"]:.0%} of the time; one not addressed, {summary["not_addressed_rate"]:.0%}.' if summary else ""
+    if und:
+        r2 = und["r2"]
+        verdict = (
+            f"Being asked by name is what matters most.{named} Among the asks addressed to nobody in particular, a given agent present answers <b>{und['rate']:.0%}</b> of the time, and whether the asker had answered it lately, whether the asker answers others, "
+            f"whether it was busy and how many others were present together explain <b>{r2['all four']:.0%}</b> of who answers."
+        )
+        body = '<p class="meaning">"Explain" here is the share of the uncertainty about who answers an undirected ask that a factor removes (McFadden\'s R-squared of a logistic model, 0 when knowing the factor helps not at all, 1 when it settles the matter). The bars give the plain answer rates behind it: one row per undirected ask and agent present, in the eras on this card.</p>'
+        body += _fig("help_rates")
+        r2t = pd.DataFrame({"factor": [f for f, _ in FACTORS] + ["all four together"], "which is": [text for _, text in FACTORS] + [""], "share of who answers explained": [r2[f] for f, _ in FACTORS] + [r2["all four"]]})
+        body += _table(r2t, {"share of who answers explained": ".1%"})
+        body += f'<p class="meaning">{und["requests"]:,} undirected asks, {und["n"]:,} ask-agent pairs.</p>'
+        body += _drawer("The full model ladder, scored out of sample against a lookup table", _table(rows, {"log loss": ".4f", "completeness": ".2f"}))
+        chip = _tag("info", f"four factors explain {r2['all four']:.0%} of who answers undirected asks")
+    else:
+        verdict = f"Being addressed by name reaches <b>{first.completeness:.0%}</b> of what a lookup table can explain; adding reciprocity, cost and bystanders reaches <b>{last.completeness:.0%}</b> [{last.ci_lo:.0%}, {last.ci_hi:.0%}].{named}"
+        body = '<p class="meaning">A ladder of explanations, each adding one thing to the ones before: was the request addressed to you, has the asker helped you lately (direct reciprocity), does the asker help others (indirect reciprocity), were you busy (cost), how many others were present (bystanders). Nested logistic models, scored out of sample. Completeness is how much of the gain a lookup table of every covariate combination achieves each rung reaches.</p>'
+        body += _fig("ladder") + _table(rows, {"log loss": ".4f", "completeness": ".2f"})
+        chip = _tag("info", f"model reaches {last.completeness:.0%} of the ceiling")
     if (d / "helping_coefficients.csv").exists():
         c = pd.read_csv(d / "helping_coefficients.csv", index_col=0).T.rename(columns=FEATURE_NAMES).reset_index(names="fit")
         note = f'<p class="meaning">Log-odds coefficients of the full model, refitted each way a pooled fit could mislead. {esc(summary.get("top_asker", "One agent"))} alone asks {summary.get("top_asker_share", 0):.0%} of all requests, hence the equal-weight row.</p>' if summary else ""
@@ -422,7 +492,7 @@ def helping_cards(d, group, lab, drop, bench):
     if ex is not None and len(ex):
         body += _drawer(f"Evidence: {len(ex)} request-and-answer pairs, verbatim", "".join(_exchange(r) for r in ex.itertuples()))
     body += _benchmarks(bench, "helping")
-    cards = [(_card(t1, verdict, body, a1), (t1, _tag("info", f"model reaches {last.completeness:.0%} of the ceiling"), a1))]
+    cards = [(_card(t1, verdict, body, a1), (t1, chip, a1))]
 
     curve = pd.read_csv(d / "helping_bystander.csv")
     curve = curve[~curve.era.map(lambda e: f"{group} {e}").isin(drop)]
@@ -464,27 +534,81 @@ def evidence_card(d):
     return _card(title, verdict, body, anchor), (title, _tag("info", f"{share:.0%} backed"), anchor)
 
 
-def diffusion_card(d):
-    title, anchor = "Does information spread along ties?", "diffusion"
-    path = d / "diffusion_items.csv"
-    if not path.exists():
+def adoption_payload(d, order, msgs):
+    """Every adoption of every item (diffusion_adoptions.csv): the replay, and the general patterns read off it."""
+    p = d / "diffusion_adoptions.csv"
+    if not p.exists():
+        return None
+    ad = pd.read_csv(p, parse_dates=["ts"])
+    idx = {a: i for i, a in enumerate(order)}
+    ad = ad[ad.actor.isin(idx)].sort_values(["item", "ts"])
+    if ad.empty:
+        return None
+    ad["days"] = (ad.ts - ad.groupby("item").ts.transform("min")).dt.total_seconds() / 86400
+    ad["rank"] = ad.groupby("item").cumcount()
+    n = ad.groupby("item").actor.transform("size")
+    items = ad.groupby("item").agg(kind=("kind", "first"), adopters=("actor", "size"), first=("ts", "min"), days=("days", "max"), first_adopter=("actor", "first")).reset_index()
+    second = ad[ad["rank"] == 1].groupby("item").days.min()
+    half = ad[(ad["rank"] + 1) * 2 >= n].groupby("item").days.min()
+    curve = []
+    for t in [0, 0.5, 1, 2, 3, 5, 7, 10, 14, 21, 30, 45, 60, 90]:
+        s = (ad.days <= t).groupby(ad.item).mean()
+        curve.append({"day": t, "median": float(s.median()), "lo": float(s.quantile(0.25)), "hi": float(s.quantile(0.75))})
+    firsts = items.first_adopter.value_counts()
+    vol = msgs.actor.value_counts(normalize=True)
+    originators = [{"agent": a, "first": int(c), "share_first": float(c / len(items)), "share_msgs": float(vol.get(a, 0))} for a, c in firsts.head(10).items()]
+    seq = {it: [[idx[a], round(float(dd), 2)] for a, dd in zip(g.actor, g.days)] for it, g in ad.groupby("item")}
+    shown = items.assign(first=items["first"].dt.strftime("%Y-%m-%d"), days=items.days.round(1)).sort_values(["adopters", "days"], ascending=[False, True])
+    return {
+        "items": _records(shown), "seq": seq, "curve": curve, "kinds": {k: int(v) for k, v in items.kind.value_counts().items()}, "originators": originators,
+        "speed": {"second": float(second.median()), "half": float(half.median()), "all": float(items.days.median()), "within_day": float((items.days <= 1).mean()), "within_week": float((items.days <= 7).mean())},
+    }
+
+
+def lead_vs_rank(d, group, drop, agents):
+    """Each agent's lead score in adoption against its David's score in the dominance hierarchy, mean over the eras on the card."""
+    lp, rp = d / "diffusion_leaders.csv", d / f"hierarchy_ranks_{group}.csv"
+    if not (lp.exists() and rp.exists()):
+        return None
+    lead, r = pd.read_csv(lp), pd.read_csv(rp)
+    r = r[r.group.str.startswith(group.split("_")[0]) & ~r.group.isin(drop)]
+    ds = r.groupby("agent").davids_score.mean()
+    m = lead[lead.agent.isin(ds.index)].assign(davids_score=lambda x: x.agent.map(ds))
+    if len(m) < 4:
+        return None
+    fam = dict(zip(agents.agent, agents.family))
+    return {
+        "rho": float(m.lead_score.rank().corr(m.davids_score.rank())), "n": int(len(m)),
+        "points": [{"agent": a, "family": fam.get(a, "unknown"), "lead": float(lv), "rank": float(s), "messages": int(mm)} for a, lv, s, mm in zip(m.agent, m.lead_score, m.davids_score, m.messages)],
+    }
+
+
+def diffusion_card(d, ad, lr):
+    title, anchor = "How does information spread?", "diffusion"
+    if not (d / "diffusion_items.csv").exists():
         return _missing(title, "swarm-sna diffusion", anchor)
-    t = pd.read_csv(path)
-    if t.empty:
-        verdict = _tag("unknown", "not testable") + f" No link, file name or backticked term spread to {MIN_AD}+ agents in this transcript, so there is no adoption order to test."
+    if ad is None and pd.read_csv(d / "diffusion_items.csv").empty:
+        verdict = _tag("unknown", "not testable") + f" No link, file name or backticked term spread to {MIN_AD}+ agents in this transcript."
         return _card(title, verdict, "", anchor), (title, _tag("unknown", "not testable"), anchor)
-    z = t.z.dropna()
-    share = (t.p < 0.05).mean()
-    stouffer = z.mean() * np.sqrt(len(z)) if len(z) else np.nan
-    yes = stouffer > 1.96
-    label = "adoption follows ties: yes" if yes else "adoption follows ties: no"
-    verdict = _tag("yes" if yes else "no", label) + f" {len(t)} items (links, file names, backticked terms) that spread to {MIN_AD}+ agents, whole record. The next adopter ranks <b>{t.observed.mean():.2f}</b> among the agents still to adopt, by ties to those who already had (0.50 by chance). In {share:.1%} of items the order leans on ties more than random orders do (5% expected by chance); combined z = {stouffer:+.1f}."
-    body = '<p class="meaning">Diffusion: does something new (a link, a file name, a term) travel along the ties of the network, so that the agents who pick it up next are the ones connected to those who already have it? Order-of-acquisition analysis as a rank test (Franz &amp; Nunn 2009; Hoppitt &amp; Laland 2013). For each item, agents are ordered by first use. At each adoption the adopter is ranked, by tie weight to the agents who already adopted, among the agents who had not yet (0 = least tied, 1 = most); the statistic is the mean rank, and the null permutes the order among the same agents. Ties are mentions in the month before the item first appeared. An item has few adoptions, so single-item tests are weak; the pooled rank and the combined z carry the evidence.</p>'
-    body += _fig("diffusion_items")
-    body += '<p class="meaning">Read with care in a shared chat room: every agent sees every message, so access to an item is not gated by ties the way it is in an animal group. The test asks whether attention ties predict who picks something up next, not whether they were needed to hear of it.</p>'
-    top = t.nsmallest(8, "p")[["item", "adopters", "first_adopter", "spread_days", "observed", "z", "p"]].rename(columns={"spread_days": "days to spread", "first_adopter": "first adopter", "observed": "adopter rank"})
-    body += _drawer("The eight items whose spread leans most on ties", _table(top, {"days to spread": ".0f", "adopter rank": ".2f", "z": "+.2f", "p": ".3f"}))
-    chips = [_tag("yes" if yes else "no", label)]
+    chips = []
+    body = '<p class="meaning">An item is something distinctive one agent can pick up from another: a link, a file name, a backticked term. For each item the agents are ordered by first use, and that order is its spread. Every agent sees every message in a shared room, so this is diffusion of attention, not of access: who picks a thing up, and how soon after whom.</p>'
+    if ad:
+        sp, kinds = ad["speed"], ad["kinds"]
+        verdict = (
+            f"<b>{len(ad['items']):,}</b> items spread to {MIN_AD}+ agents over the whole record ({', '.join(f'{v:,} {k}s' for k, v in sorted(kinds.items(), key=lambda kv: -kv[1]))}). "
+            f"The median item reaches a second adopter <b>{sp['second']:.1f} days</b> after the first and half of its adopters within <b>{sp['half']:.1f} days</b>; {sp['within_week']:.0%} of items have finished spreading within a week."
+        )
+        if ad["originators"]:
+            top = ad["originators"][0]
+            verdict += f" {esc(top['agent'])} is the first adopter most often: {top['share_first']:.0%} of items, against {top['share_msgs']:.0%} of messages."
+        body += "<h3>The general pattern</h3>" + _fig("diffusion_patterns")
+        orig = pd.DataFrame(ad["originators"]).rename(columns={"first": "items first", "share_first": "share of first adoptions", "share_msgs": "share of messages"})
+        body += _drawer("Who is first most often", _table(orig, {"share of first adoptions": ".0%", "share of messages": ".0%"}))
+        body += "<h3>Watch one item spread</h3>"
+        body += '<p class="meaning">Pick an item and play its adoption in order. Each agent lights up when it first uses the item, numbered by its place in the sequence; the ties drawn are the mentions, over the whole record, between the agents that already have it.</p>' + _fig("diffusion_run")
+        chips.append(_tag("info", f"half of an item's adopters within {sp['half']:.1f} days"))
+    else:
+        verdict = "The per-item adoption sequences are not in this directory: re-run <code>swarm-sna diffusion</code>, which now writes diffusion_adoptions.csv, to get the patterns and the replay."
 
     # The adoption network: who picks things up first, who follows (diffusion_leaders.csv, diffusion_edges.csv).
     lead_path, sm_path = d / "diffusion_leaders.csv", d / "diffusion_summary.csv"
@@ -493,7 +617,7 @@ def diffusion_card(d):
         if len(lead) and "steepness" in sm and pd.notna(sm.steepness):
             beyond = sm.steepness_volume_p < ALPHA and sm.steepness > sm.steepness_volume_null
             steep = "steeper than volume alone predicts" if beyond else "no steeper than volume alone predicts"
-            body += "<h3>The adoption network: who picks things up first, and who follows</h3>"
+            body += "<h3>Who picks things up first, and who follows</h3>"
             body += f'<p class="meaning">Adoption defines its own network. For each item, every adopter after the first hands one unit of credit, split evenly, to the agents who had it before. An agent\'s lead score is (credit received &minus; credit given) / total: +1 is always first, &minus;1 always after others. Across {int(sm.network_items)} items the leader-follower ordering is <b>{steep}</b> (steepness {sm.steepness:.3f}; null with order drawn in proportion to posting volume {sm.steepness_volume_null:.3f}, p = {sm.steepness_volume_p:.3f}; plain random order {sm.steepness_random_null:.3f}, p = {sm.steepness_random_p:.3f}).</p>'
             body += _fig("leaders") + _fig("diffusion_network")
             if (d / "diffusion_correlates.csv").exists():
@@ -503,6 +627,12 @@ def diffusion_card(d):
             show = lead.sort_values("lead_score", ascending=False)[["agent", "led", "followed", "lead_score", "z_random_order", "z"]].rename(columns={"lead_score": "lead score", "z_random_order": "z, random order", "z": "z, volume-weighted"})
             body += _drawer("Every agent's lead score", _table(show, {"led": ".0f", "followed": ".0f", "lead score": "+.2f", "z, random order": "+.1f", "z, volume-weighted": "+.1f"}))
             chips.append(_tag("yes" if beyond else "no", "leaders beyond volume: " + ("yes" if beyond else "no")))
+    if lr:
+        rho = lr["rho"]
+        reading = "leading in adoption goes with rank in the hierarchy." if rho > 0.3 else "the agents that lead in adoption rank low in the hierarchy." if rho < -0.3 else "leading in adoption and rank in the hierarchy are largely separate things."
+        body += "<h3>Do the agents that lead in adoption rank high in the dominance hierarchy?</h3>"
+        body += f'<p class="meaning">Each agent\'s lead score in adoption against its David\'s score from the directive contests, averaged over the eras on this card. Spearman rank correlation <b>{rho:+.2f}</b> over {lr["n"]} agents: {reading}</p>' + _fig("lead_vs_rank")
+        chips.append(_tag("info", f"leaders vs dominance rank: ρ = {rho:+.2f}"))
     return _card(title, verdict, body, anchor), (title, " ".join(chips), anchor)
 
 
@@ -581,7 +711,10 @@ def payload(d, group, groups, msgs, events, agents, mentions, req, resp, drop, n
         draws = json.loads(draws_path.read_text()) if draws_path.exists() else None
         if draws:
             draws = {n: {s: {g: v for g, v in by_g.items() if g not in drop} for s, by_g in by_s.items()} for n, by_s in draws.items()}
-        out["nulls"] = {"table": _records(t[t.null.isin(NULL_NAMES)]), "stats": [{"key": k, "label": STAT_LABELS[k]} for k in [s for s, _, _ in NETWORK_CARDS]], "null_names": NULL_NAMES, "draws": draws}
+        draws = {null: draws[null]} if draws and null in draws else None  # only the default shuffle is drawn; each verdict says whether the other agrees
+        out["nulls"] = {"table": _records(t[t.null == null]), "stats": [{"key": k, "label": STAT_LABELS[k]} for k in [s for s, _, _ in NETWORK_CARDS]], "null_names": {null: NULL_NAMES[null]}, "draws": draws}
+    order = agents.sort_values("joined").agent.tolist()
+    order += sorted(set(msgs.actor) - set(order))
     if mentions is not None:
         out["networks"] = networks_payload(msgs, mentions, agents, group)
         out["timeline"] = timeline_payload(events, msgs, mentions, agents, group, req, resp)
@@ -589,7 +722,7 @@ def payload(d, group, groups, msgs, events, agents, mentions, req, resp, drop, n
         summary = json.loads((d / "helping_summary.json").read_text()) if (d / "helping_summary.json").exists() else {}
         by = pd.read_csv(d / "helping_bystander.csv") if (d / "helping_bystander.csv").exists() else pd.DataFrame(columns=["era"])
         by = by[~by.era.map(lambda e: f"{group} {e}").isin(drop)]
-        out["helping"] = {"ladder": _csv(d / "helping_ladder.csv"), "bystander": _records(by), "sizes": list(SIZE_LABELS), "slope": summary.get("bystander_slope"), "summary": summary}
+        out["helping"] = {"ladder": _csv(d / "helping_ladder.csv"), "bystander": _records(by), "sizes": list(SIZE_LABELS), "slope": summary.get("bystander_slope"), "summary": summary, "undirected": undirected_asks(d, group, drop)}
     if (d / f"hierarchy_{group}.csv").exists():
         h = pd.read_csv(d / f"hierarchy_{group}.csv")
         r = pd.read_csv(d / f"hierarchy_ranks_{group}.csv") if (d / f"hierarchy_ranks_{group}.csv").exists() else pd.DataFrame(columns=["group"])
@@ -600,7 +733,10 @@ def payload(d, group, groups, msgs, events, agents, mentions, req, resp, drop, n
         out["trends"] = {"weekly": _records(w), "series": [list(s) for s in TREND_SERIES], "era_starts": {str(_clean(e)): wk for e, wk in w.dropna(subset=["era"]).groupby("era").week.min().items()}}
     if (d / "diffusion_items.csv").exists():
         sm = _csv(d / "diffusion_summary.csv")
-        out["diffusion"] = {"items": _csv(d / "diffusion_items.csv"), "leaders": _csv(d / "diffusion_leaders.csv") or [], "edges": _csv(d / "diffusion_edges.csv") or [], "summary": sm[0] if sm else None}
+        out["diffusion"] = {
+            "leaders": _csv(d / "diffusion_leaders.csv") or [], "edges": _csv(d / "diffusion_edges.csv") or [], "summary": sm[0] if sm else None,
+            "adoptions": adoption_payload(d, order, msgs), "lead_rank": lead_vs_rank(d, group, drop, agents),
+        }
     return out
 
 
@@ -644,7 +780,9 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
     data = payload(d, group, groups, amsgs, ev, agents, mentions, req, resp, drop, null)
     bench = load_benchmarks(meta)
     cards = [time_card(d, data["timeline"] is not None, group, lab, drop)] + network_cards(d, group, lab, drop, thin_set, null, n_perm, bench) + [hierarchy_card(d, group, lab, drop, thin_set, bench)]
-    cards += helping_cards(d, group, lab, drop, bench) + [evidence_card(d), diffusion_card(d), quality_card(d, validation)]
+    und = data["helping"]["undirected"] if data["helping"] else None
+    ad, lr = (data["diffusion"]["adoptions"], data["diffusion"]["lead_rank"]) if data["diffusion"] else (None, None)
+    cards += helping_cards(d, group, lab, drop, bench, und) + [evidence_card(d), diffusion_card(d, ad, lr), quality_card(d, validation)]
     cards = [c for c in cards if c]
     glance = "".join(f'<li><a href="#{a}">{esc(t)}</a><span class="chips">{chips}</span></li>' for _, (t, chips, a) in cards[1:])
     intro_html = intro_card(intro, groups, msgs, group)
