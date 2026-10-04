@@ -382,27 +382,23 @@ def diffusion_card(d):
     body += _drawer("The eight items whose spread leans most on ties", _table(top, {"days to spread": ".0f", "adopter rank": ".2f", "z": "+.2f", "p": ".3f"}))
     chips = [_tag(o, label)]
 
-    net_path = d / "diffusion_network.json"
-    if net_path.exists() and (d / "diffusion_edges.csv").exists():
-        net = json.loads(net_path.read_text())
-        edges = pd.read_csv(d / "diffusion_edges.csv")
-        if net.get("edges"):
-            body += "<h3>Who adopts after whom: the diffusion network</h3>"
-            sig = int(net.get("significant_edges") or 0)
-            r, p = net.get("dyad_spearman"), net.get("dyad_qap_p")
-            same = "unknown" if r is None else "above" if (p is not None and p < ALPHA and r > 0) else "within"
-            same_label = "unknown" if r is None else "the same graph as attention" if same == "above" else "a different graph from attention"
-            text = f"The most recent earlier adopter of each item is taken as its source, which gives a network of {net['edges']:,} edges among {net['agents']} agents; <b>{sig}</b> of them pass q &lt; 0.1 against random adoption orders. "
-            if r is not None:
-                text += f"Over the {net.get('dyads', 0):,} pairs of agents that adopted an item in common, this network correlates <b>{r:+.2f}</b> (Spearman) with how often the two mention each other, QAP p = {p if p is None else format(p, '.3f')}. "
-            text += "Node-level: how often an agent is the source correlates " + f"{net.get('node_spearman_source_vs_mention_in', float('nan')):+.2f} with mentions received and {net.get('node_spearman_source_vs_messages', float('nan')):+.2f} with messages sent."
-            body += f'<p class="verdict">{_tag(same, same_label)} {text}</p>' + _fig("diffusion_network")
-            e = edges.nsmallest(12, "p")[["source", "target", "items", "co_adopted", "null_mean", "z", "q"]]
-            body += _drawer("The twelve edges least likely under random order", _table(e, {"null_mean": ".2f", "z": "+.2f", "q": ".3f"}))
-            if (d / "diffusion_nodes.csv").exists():
-                n = pd.read_csv(d / "diffusion_nodes.csv").head(10)
-                body += _drawer("Originators and followers: the ten agents most often the source", _table(n, {"mean_rank": ".2f"}))
-            chips.append(_tag(same, same_label))
+    # The adoption network: who picks things up first, who follows (diffusion_leaders.csv, diffusion_edges.csv).
+    lead_path, sm_path = d / "diffusion_leaders.csv", d / "diffusion_summary.csv"
+    if lead_path.exists() and sm_path.exists():
+        lead, sm = pd.read_csv(lead_path), pd.read_csv(sm_path).iloc[0]
+        if len(lead) and "steepness" in sm and pd.notna(sm.steepness):
+            beyond = sm.steepness_volume_p < ALPHA and sm.steepness > sm.steepness_volume_null
+            steep = "steeper than volume alone predicts" if beyond else "no steeper than volume alone predicts"
+            body += "<h3>The adoption network: who picks things up first, and who follows</h3>"
+            body += f'<p class="meaning">Adoption defines its own network. For each item, every adopter after the first hands one unit of credit, split evenly, to the agents who had it before. An agent\'s lead score is (credit received &minus; credit given) / total: +1 is always first, &minus;1 always after others. Across {int(sm.network_items)} items the leader-follower ordering is <b>{steep}</b> (steepness {sm.steepness:.3f}; null with order drawn in proportion to posting volume {sm.steepness_volume_null:.3f}, p = {sm.steepness_volume_p:.3f}; plain random order {sm.steepness_random_null:.3f}, p = {sm.steepness_random_p:.3f}).</p>'
+            body += _fig("leaders") + _fig("diffusion_network")
+            if (d / "diffusion_correlates.csv").exists():
+                c = pd.read_csv(d / "diffusion_correlates.csv").rename(columns={"Unnamed: 0": "leading, measured as"})
+                body += '<p class="meaning">Does leading go with capability, talkativeness or rank? Rank correlations across agents. The two nulls bracket the truth: plain random order ignores that heavy posters reach everything sooner; volume-weighted order assumes an agent posting ten times as much adopts ten times sooner.</p>'
+                body += _table(c, {k: "+.2f" for k in c.columns if k.startswith("vs")})
+            show = lead.sort_values("lead_score", ascending=False)[["agent", "led", "followed", "lead_score", "z_random_order", "z"]].rename(columns={"lead_score": "lead score", "z_random_order": "z, random order", "z": "z, volume-weighted"})
+            body += _drawer("Every agent's lead score", _table(show, {"led": ".0f", "followed": ".0f", "lead score": "+.2f", "z, random order": "+.1f", "z, volume-weighted": "+.1f"}))
+            chips.append(_tag("above" if beyond else "within", "leader-follower order: " + ("beyond volume" if beyond else "explained by volume")))
     return _card(title, verdict, body, anchor), (title, " ".join(chips), anchor)
 
 
@@ -491,8 +487,8 @@ def payload(d, group, groups, msgs, events, agents, mentions, req, resp):
         w = pd.read_csv(d / "trends_weekly.csv")
         out["trends"] = {"weekly": _records(w), "series": [list(s) for s in TREND_SERIES], "era_starts": {str(_clean(e)): wk for e, wk in w.dropna(subset=["era"]).groupby("era").week.min().items()}}
     if (d / "diffusion_items.csv").exists():
-        net = d / "diffusion_network.json"
-        out["diffusion"] = {"items": _csv(d / "diffusion_items.csv"), "edges": _csv(d / "diffusion_edges.csv") or [], "nodes": _csv(d / "diffusion_nodes.csv") or [], "network": json.loads(net.read_text()) if net.exists() else None}
+        sm = _csv(d / "diffusion_summary.csv")
+        out["diffusion"] = {"items": _csv(d / "diffusion_items.csv"), "leaders": _csv(d / "diffusion_leaders.csv") or [], "edges": _csv(d / "diffusion_edges.csv") or [], "summary": sm[0] if sm else None}
     return out
 
 
@@ -529,6 +525,7 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
     if thin:
         parts = ", ".join(f"{g['name']} ({g['median_active']:.0f})" for g in groups if g["thin"])
         thin_text = f" A group whose median day has fewer than {min_agents} agents is shown but not judged: {esc(parts)}."
+    data_json = json.dumps(_clean(data), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")  # never closes the script element early
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Swarm report card</title><style>{_static("card.css")}</style></head><body>
 <header><h1>Swarm report card</h1><p class="sub">{esc(title or d.name)} &middot; {esc(str(msgs.day.min()))} to {esc(str(msgs.day.max()))}</p>
@@ -539,7 +536,7 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
 {"".join(c for c, _ in cards)}
 </main>
 <footer>Generated by swarm-sna. Null models follow Bejder et al. 1998 and Farine 2017; dominance measures follow de Vries et al. 2006 and Shizuka &amp; McDonald 2012. Figures drawn with D3 (Mike Bostock, ISC licence).</footer>
-<script id="card-data" type="application/json">{json.dumps(_clean(data), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")}</script>
+<script id="card-data" type="application/json">{data_json}</script>
 <script>{_static("d3.v7.min.js")}</script>
 <script>{_static("card.js")}</script>
 </body></html>"""

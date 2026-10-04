@@ -72,33 +72,33 @@
     ctl.append("span").attr("class", "ctl-label").text("null");
     ctl.selectAll("button").data(kinds).join("button").attr("class", k => "seg" + (k === kind ? " on" : "")).text(k => N.null_names[k])
       .on("click", (e, k) => { el._null = k; el.replaceChildren(); nulls(el); });
-    const W = width(el), left = 112, top = 22, rowH = 92;
+    const W = width(el), left = 112, top = 22, rowH = 104;
     const colW = Math.max(150, (W - left) / groups.length);
     const svg = svgIn(el, W, top + rowH * N.stats.length);
     N.stats.forEach((s, r) => {
       const y0 = top + r * rowH;
-      wrap(s.label, 16).forEach((line, i) => svg.append("text").attr("x", 0).attr("y", y0 + 26 + i * 13).attr("fill", P.ink).attr("font-size", 11.5).attr("font-weight", 600).text(line));
+      wrap(s.label, 16).forEach((line, i) => svg.append("text").attr("x", 0).attr("y", y0 + 30 + i * 13).attr("fill", P.ink).attr("font-size", 11.5).attr("font-weight", 600).text(line));
       groups.forEach((g, c) => {
         const row = N.table.find(t => t.statistic === s.key && t.group === g && t.null === kind);
         if (!row) return;
-        const x0 = left + c * colW, w = colW - 22, h = rowH - 30;
+        const x0 = left + c * colW, w = colW - 22, h = rowH - 32;
         const draws = N.draws && N.draws[kind] && N.draws[kind][s.key] && N.draws[kind][s.key][g];
         const cell = svg.append("g").attr("transform", `translate(${x0},${y0})`);
         if (r === 0) cell.append("text").attr("y", -8).attr("fill", thin.has(g) ? P.muted : P.ink).attr("font-size", 11.5).attr("font-weight", 600).text(g + (thin.has(g) ? "  (thin)" : ""));
         const lo = Math.min(row.null_lo, row.observed, draws ? d3.min(draws) : Infinity), hi = Math.max(row.null_hi, row.observed, draws ? d3.max(draws) : -Infinity);
-        const pad = (hi - lo) * 0.1 || 0.01;
+        const pad = (hi - lo) * 0.1 || Math.max(Math.abs(hi) * 0.02, 0.005);  // a degenerate null (every draw equal) still gets a readable axis
         const x = d3.scaleLinear().domain([lo - pad, hi + pad]).range([0, w]);
         if (draws && draws.length) {
           const bins = d3.bin().domain(x.domain()).thresholds(x.ticks(28))(draws);
-          const y = d3.scaleLinear().domain([0, d3.max(bins, b => b.length) || 1]).range([h, h * 0.3]);
+          const y = d3.scaleLinear().domain([0, d3.max(bins, b => b.length) || 1]).range([h, h * 0.5]);
           cell.selectAll("rect.bin").data(bins).join("rect").attr("class", "bin").attr("x", b => x(b.x0) + 0.5).attr("width", b => Math.max(0.5, x(b.x1) - x(b.x0) - 1))
             .attr("y", b => y(b.length)).attr("height", b => h - y(b.length)).attr("fill", P.null);
         } else {
-          cell.append("rect").attr("x", x(row.null_lo)).attr("width", Math.max(2, x(row.null_hi) - x(row.null_lo))).attr("y", h * 0.55).attr("height", 10).attr("rx", 2).attr("fill", P.null);
-          cell.append("circle").attr("cx", x(row.null_mean)).attr("cy", h * 0.55 + 5).attr("r", 3.5).attr("fill", P.muted).attr("stroke", "#fff").attr("stroke-width", 2);
+          cell.append("rect").attr("x", x(row.null_lo)).attr("width", Math.max(2, x(row.null_hi) - x(row.null_lo))).attr("y", h * 0.65).attr("height", 10).attr("rx", 2).attr("fill", P.null);
+          cell.append("circle").attr("cx", x(row.null_mean)).attr("cy", h * 0.65 + 5).attr("r", 3.5).attr("fill", P.muted).attr("stroke", "#fff").attr("stroke-width", 2);
         }
         cell.append("line").attr("x1", x(row.observed)).attr("x2", x(row.observed)).attr("y1", 2).attr("y2", h).attr("stroke", P.observed).attr("stroke-width", 2);
-        cell.append("g").attr("transform", `translate(0,${h})`).call(d3.axisBottom(x).ticks(4).tickSize(3).tickFormat(d3.format(".2f"))).call(axis);
+        cell.append("g").attr("transform", `translate(0,${h})`).call(d3.axisBottom(x).ticks(4).tickSize(3)).call(axis);
         const start = row.observed > row.null_mean, tx = start ? 2 : w - 2;
         const t = cell.append("text").attr("x", tx).attr("y", 10).attr("text-anchor", start ? "start" : "end").attr("font-size", 10).attr("fill", P.ink);
         t.append("tspan").attr("x", tx).text("observed " + f3(row.observed));
@@ -135,9 +135,10 @@
     const links = linkData.filter(l => byId.has(l.source) && byId.has(l.target)).map(l => Object.assign({}, l));
     const wmax = d3.max(links, l => l.w) || 1, smax = d3.max(nodes, size) || 1;
     const r = d => 4 + 15 * Math.sqrt(size(d) / smax);
+    const k = Math.min(w, h);  // forces scale with the panel, so a few agents still fill it
     const sim = d3.forceSimulation(nodes)
-      .force("link", d3.forceLink(links).id(d => d.id).distance(l => 36 + 70 * (1 - l.w / wmax)).strength(l => 0.15 + 0.6 * l.w / wmax))
-      .force("charge", d3.forceManyBody().strength(-110)).force("center", d3.forceCenter(w / 2, h / 2 + 8)).force("collide", d3.forceCollide(d => r(d) + 5)).stop();
+      .force("link", d3.forceLink(links).id(d => d.id).distance(l => k * (0.16 + 0.34 * (1 - l.w / wmax))).strength(l => 0.15 + 0.6 * l.w / wmax))
+      .force("charge", d3.forceManyBody().strength(-2 * k)).force("center", d3.forceCenter(w / 2, h / 2 + 8)).force("collide", d3.forceCollide(d => r(d) + 7)).stop();
     for (let i = 0; i < 300; i++) sim.tick();
     nodes.forEach(d => { d.x = Math.max(r(d) + 16, Math.min(w - r(d) - 16, d.x)); d.y = Math.max(r(d) + 30, Math.min(h - r(d) - 8, d.y)); });
     g.append("text").attr("x", 8).attr("y", 16).attr("fill", P.ink).attr("font-size", 12).attr("font-weight", 600).text(title);
@@ -310,7 +311,7 @@
         const pts = rows.filter(r => r[col] != null);
         g.append("path").datum(pts).attr("fill", "none").attr("stroke", colour).attr("stroke-width", 2).attr("stroke-linejoin", "round").attr("d", d3.line().x(r => x(r.size)).y(r => y(r[col])));
         g.selectAll(null).data(pts).join("circle").attr("cx", r => x(r.size)).attr("cy", r => y(r[col])).attr("r", 4.5).attr("fill", colour).attr("stroke", "#fff").attr("stroke-width", 2);
-        if (pts.length) { const last = pts[pts.length - 1]; g.append("text").attr("x", x(last.size)).attr("y", y(last[col]) - 9).attr("text-anchor", "middle").attr("font-size", 10.5).attr("fill", P.ink).text(pct(last[col])); }
+        if (pts.length) { const last = pts[pts.length - 1], v = last[col]; g.append("text").attr("x", x(last.size)).attr("y", v > 0.85 ? y(v) + 17 : y(v) - 9).attr("text-anchor", "middle").attr("font-size", 10.5).attr("fill", P.ink).text(pct(v)); }
       });
       g.selectAll(null).data(rows).join("rect").attr("x", r => x(r.size) - x.step() / 2).attr("y", 20).attr("width", x.step()).attr("height", ph - 60).attr("fill", "transparent")
         .on("pointermove", (e, r) => showTip(e, `${D.group_label} ${era} · ${r.size} agents present`, series.map(([c, l, colour]) => [l, r[c] == null ? "n/a" : pct(r[c]), colour]).concat([["broadcast requests", int(r.requests)]]))).on("pointerleave", hideTip);
@@ -326,7 +327,8 @@
     const W = width(el), left = 110, rh = 30, h = rh * rows.length + 36;
     const svg = svgIn(el, W, h);
     const lo = d3.min(rows, r => Math.min(r.null_lo, r.observed)), hi = d3.max(rows, r => Math.max(r.null_hi, r.observed));
-    const x = d3.scaleLinear().domain([Math.max(0, lo - (hi - lo) * 0.2), hi + (hi - lo) * 0.25]).range([left, W - 16]);
+    const span = Math.max(hi - lo, 0.05);
+    const x = d3.scaleLinear().domain([Math.max(0, lo - span * 0.2), hi + span * 0.25]).range([left, W - 16]);
     const y = i => 10 + i * rh + rh / 2;
     grid(svg.append("g"), x, 5, h - 26, false);
     rows.forEach((r, i) => {
@@ -375,15 +377,15 @@
   // ---- the weekly series, stacked on one time axis, with a crosshair
   function trends(el) {
     const Tr = D.trends; if (!Tr || !Tr.weekly.length) return;
-    const weeks = Tr.weekly.map(r => new Date(r.week)), W = width(el), left = 46, ph = 78, h = ph * Tr.series.length + 24;
+    const weeks = Tr.weekly.map(r => new Date(r.week)), W = width(el), left = 46, ph = 84, h = ph * Tr.series.length + 24;
     const svg = svgIn(el, W, h);
     const x = d3.scaleTime().domain(d3.extent(weeks)).range([left, W - 14]);
     const panels = Tr.series.map(([col, label], i) => {
       const vals = Tr.weekly.map(r => r[col]), rate = d3.max(vals.filter(v => v != null)) <= 1;
-      const y = d3.scaleLinear().domain([0, rate ? 1 : (d3.max(vals) || 1)]).range([i * ph + ph - 14, i * ph + 20]);
+      const y = d3.scaleLinear().domain([0, rate ? 1 : (d3.max(vals) || 1)]).range([i * ph + ph - 14, i * ph + 26]);
       const g = svg.append("g");
       grid(g.append("g").attr("transform", `translate(${left},0)`), y, 2, W - left - 14, true);
-      g.append("text").attr("x", left).attr("y", i * ph + 12).attr("font-size", 11).attr("font-weight", 600).attr("fill", P.ink).text(label);
+      g.append("text").attr("x", left + 4).attr("y", i * ph + 12).attr("font-size", 11).attr("font-weight", 600).attr("fill", P.ink).text(label);
       g.append("g").attr("transform", `translate(${left},0)`).call(d3.axisLeft(y).ticks(2).tickSize(3).tickFormat(rate ? pct : d3.format("~s"))).call(axis);
       g.append("path").datum(Tr.weekly.filter(r => r[col] != null)).attr("fill", "none").attr("stroke", P.series[0]).attr("stroke-width", 2).attr("stroke-linejoin", "round")
         .attr("d", d3.line().defined(r => r[col] != null).x(r => x(new Date(r.week))).y(r => y(r[col])));
@@ -391,8 +393,9 @@
     });
     Object.entries(Tr.era_starts).forEach(([era, start]) => {
       const xs = x(new Date(start));
+      if (xs <= left + 1) return;  // the first group starts at the axis; a label there would sit on the panel title
       svg.append("line").attr("x1", xs).attr("x2", xs).attr("y1", 2).attr("y2", h - 24).attr("stroke", P.observed).attr("stroke-opacity", 0.6);
-      svg.append("text").attr("x", xs + 4).attr("y", 10).attr("font-size", 10).attr("fill", P.observed).text(`${D.group_label} ${era}`);
+      svg.append("text").attr("x", xs + 4).attr("y", h - 28).attr("font-size", 10).attr("fill", P.observed).text(`${D.group_label} ${era}`);
     });
     svg.append("g").attr("transform", `translate(0,${h - 24})`).call(d3.axisBottom(x).ticks(Math.min(8, Math.floor(W / 110))).tickSize(3)).call(axis);
     const cross = svg.append("line").attr("y1", 2).attr("y2", h - 24).attr("stroke", P.muted).attr("stroke-width", 1).style("display", "none");
@@ -429,24 +432,55 @@
     svg.append("text").attr("x", 4).attr("y", 12).attr("font-size", 10.5).attr("fill", P.muted).text("items");
   }
 
+  // the adoption network: credit flows from each adopter to those who had the item before it
   function diffusion_network(el) {
     const Df = D.diffusion; if (!Df || !Df.edges || !Df.edges.length) return;
-    let edges = Df.edges.filter(e => e.q != null && e.q < 0.1), fallback = false;
-    if (!edges.length) { edges = Df.edges.filter(e => e.items >= 2).sort((a, b) => (b.z || 0) - (a.z || 0)).slice(0, 25); fallback = true; }
-    const ids = new Set(edges.flatMap(e => [e.source, e.target]));
-    const nodes = Df.nodes.filter(n => ids.has(n.agent)).map(n => ({ id: n.agent, family: D.families[n.agent] || "unknown", source_of: n.source_of, adopted_after: n.adopted_after, items_adopted: n.items_adopted, first_adoptions: n.first_adoptions, mean_rank: n.mean_rank }));
+    const led = new Map(), followed = new Map();
+    Df.edges.forEach(e => { led.set(e.source, (led.get(e.source) || 0) + e.weight); followed.set(e.adopter, (followed.get(e.adopter) || 0) + e.weight); });
+    const edges = Df.edges.slice().sort((a, b) => b.weight - a.weight).slice(0, 70);
+    const ids = new Set(edges.flatMap(e => [e.source, e.adopter]));
+    const lead = new Map(Df.leaders.map(r => [r.agent, r]));
+    const nodes = Array.from(ids, id => ({ id, family: D.families[id] || "unknown", led: led.get(id) || 0, followed: followed.get(id) || 0, lead: lead.get(id) }));
     const W = width(el), h = Math.min(560, Math.max(360, W * 0.6));
     const svg = svgIn(el, W, h);
-    drawForce(svg.append("g"), nodes, edges.map(e => ({ source: e.source, target: e.target, w: e.items, z: e.z, q: e.q, null_mean: e.null_mean })), W, h,
-      fallback ? "no edge clears q < 0.1: the 25 strongest shown" : `${edges.length} edges with q < 0.1, ${nodes.length} agents`, true,
-      d => [["source of adoptions", int(d.source_of)], ["adopted after others", int(d.adopted_after)], ["items adopted", int(d.items_adopted)], ["first to adopt", int(d.first_adoptions)], ["mean position (0 first, 1 last)", f2(d.mean_rank)]],
-      d => d.source_of, l => [["items where source came just before target", int(l.w)], ["expected under random order", f2(l.null_mean)], ["z", l.z == null ? "n/a" : d3.format("+.2f")(l.z)], ["q (BH)", l.q == null ? "n/a" : f3(l.q)]]);
+    drawForce(svg.append("g"), nodes, edges.map(e => ({ source: e.source, target: e.adopter, w: e.weight })), W, h,
+      (edges.length < Df.edges.length ? `the ${edges.length} strongest of ${int(Df.edges.length)} edges` : `${edges.length} edges`) + `, ${nodes.length} agents`, true,
+      d => [["credit received: others adopted after it", f2(d.led)], ["credit given: adopted after others", f2(d.followed)]].concat(d.lead ? [["lead score (+1 always first)", d3.format("+.2f")(d.lead.lead_score)], ["z against volume-weighted order", d.lead.z == null ? "n/a" : d3.format("+.1f")(d.lead.z)], ["", pfmt(d.lead.p)]] : []),
+      d => d.led, l => [["credit from adopter to earlier adopter", f2(l.w)]]);
     familyLegend(el);
-    note(el, "An arrow A → B: A was the most recent earlier adopter when B first used an item. Node size: how often an agent is that source. Hover an arrow for its count against random order.");
+    note(el, "An arrow A → B: B adopted items after A had them, and B's credit for those items went partly to A. Node size: credit received. Hover an agent for its lead score.");
+  }
+
+  // each agent's lead score against the volume-weighted null
+  function leaders(el) {
+    const Df = D.diffusion; if (!Df || !Df.leaders || !Df.leaders.length) return;
+    let rows = Df.leaders.filter(r => r.lead_score != null).sort((a, b) => b.lead_score - a.lead_score);
+    let cut = false;
+    if (rows.length > 30) { rows = rows.slice(0, 15).concat(rows.slice(-15)); cut = true; }
+    const W = width(el), left = 150, rh = 22, h = rh * rows.length + 40;
+    const svg = svgIn(el, W, h);
+    const x = d3.scaleLinear().domain([-1, 1]).range([left, W - 16]);
+    const y = i => 12 + i * rh + rh / 2;
+    grid(svg.append("g"), x, 4, h - 28, false);
+    svg.append("line").attr("x1", x(0)).attr("x2", x(0)).attr("y1", 4).attr("y2", h - 28).attr("stroke", P.muted);
+    rows.forEach((r, i) => {
+      const g = svg.append("g");
+      const sd = r.z != null && r.z !== 0 ? Math.abs((r.lead_score - r.null_mean) / r.z) : null;
+      g.append("text").attr("x", left - 10).attr("y", y(i)).attr("text-anchor", "end").attr("dominant-baseline", "middle").attr("font-size", 11).attr("fill", P.ink).text(r.agent.length > 20 ? r.agent.slice(0, 19) + "…" : r.agent);
+      if (sd != null) g.append("line").attr("x1", x(Math.max(-1, r.null_mean - 1.96 * sd))).attr("x2", x(Math.min(1, r.null_mean + 1.96 * sd))).attr("y1", y(i)).attr("y2", y(i)).attr("stroke", P.null).attr("stroke-width", 6).attr("stroke-linecap", "round");
+      if (r.null_mean != null) g.append("circle").attr("cx", x(r.null_mean)).attr("cy", y(i)).attr("r", 2.5).attr("fill", P.muted);
+      g.append("circle").attr("cx", x(r.lead_score)).attr("cy", y(i)).attr("r", 5).attr("fill", familyColour(r.family || D.families[r.agent])).attr("stroke", "#fff").attr("stroke-width", 2);
+      g.append("rect").attr("x", 0).attr("y", y(i) - rh / 2).attr("width", W).attr("height", rh).attr("fill", "transparent")
+        .on("pointermove", e => showTip(e, r.agent + (r.family ? " · " + r.family : ""), [["lead score", d3.format("+.2f")(r.lead_score), familyColour(r.family || D.families[r.agent])], ["null mean, volume-weighted order", r.null_mean == null ? "n/a" : d3.format("+.2f")(r.null_mean), P.null], ["z, volume-weighted", r.z == null ? "n/a" : d3.format("+.1f")(r.z)], ["z, random order", r.z_random_order == null ? "n/a" : d3.format("+.1f")(r.z_random_order)], ["", pfmt(r.p)], ["adoption events", int(Math.round(r.led + r.followed))], ["messages", int(r.messages)]])).on("pointerleave", hideTip);
+    });
+    svg.append("g").attr("transform", `translate(0,${h - 28})`).call(d3.axisBottom(x).ticks(4).tickSize(3).tickFormat(d3.format("+.1f"))).call(axis);
+    svg.append("text").attr("x", W - 16).attr("y", h - 6).attr("text-anchor", "end").attr("font-size", 10.5).attr("fill", P.muted).text("lead score: +1 always first, −1 always after others; grey: 95% band under volume-weighted random order");
+    familyLegend(el);
+    if (cut) note(el, `The fifteen most leading and fifteen most following of ${Df.leaders.length} agents; the drawer below lists them all.`);
   }
 
   // ---- wiring
-  const RENDER = { nulls, network, timeline, ladder, bystander, hierarchy, ranks, trends, diffusion_items, diffusion_network };
+  const RENDER = { nulls, network, timeline, ladder, bystander, hierarchy, ranks, trends, diffusion_items, diffusion_network, leaders };
   function renderAll(groupedOnly) {
     document.querySelectorAll(".fig").forEach(el => {
       if (groupedOnly && !el.dataset.groups) return;

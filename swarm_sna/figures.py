@@ -232,3 +232,24 @@ def diffusion(items, path):
     fig.tight_layout()
     fig.savefig(path, dpi=160)
     plt.close(fig)
+
+
+def leaders(lead, path):
+    """Each agent's raw lead score, placed by model release date; size = adoption events."""
+    t = lead.dropna(subset=["lead_score", "release_date"])
+    if t.empty:
+        return
+    fig, ax = plt.subplots(figsize=(7.6, 4.2))
+    ax.axhline(0, color=MUTED, linewidth=1)
+    x = pd.to_datetime(t.release_date)
+    ax.scatter(x, t.lead_score, s=30 + 4 * np.sqrt(t.led + t.followed), color=[family_colour(f) for f in t.family], edgecolors="white", linewidths=0.8, zorder=3)
+    for r in pd.concat([t.nlargest(5, "lead_score"), t.nsmallest(4, "lead_score")]).itertuples():
+        ax.annotate(r.agent, (pd.Timestamp(r.release_date), r.lead_score), fontsize=7.5, color=INK, xytext=(5, 4), textcoords="offset points")
+    ax.set_xlabel("model release date", fontsize=9, color=MUTED)
+    ax.set_ylabel("lead score: +1 always first, -1 always after others", fontsize=8.5, color=INK)
+    ax.set_title("Who picks things up first, and who follows", fontsize=10, color=INK, loc="left")
+    _legend(ax, NAMED_FAMILIES + ["other"], SERIES + [OTHER], loc="lower left", ncol=4)
+    _clean(ax)
+    fig.tight_layout()
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
