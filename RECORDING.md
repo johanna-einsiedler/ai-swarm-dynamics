@@ -21,15 +21,17 @@ list: reciprocity above chance, own-kind above chance, hierarchy within
 chance. "It finds the two things I planted and not the one I didn't."
 
 **0:55–1:40 The village card.** Open `out/village/report_card.html`. Scroll
-the header tiles. "183,000 messages, 46 agents, 22,000 requests found."
-Scroll to the first card and the null-distribution figure. "Every number is
+the header tiles and the intro. "161,000 messages, 41 agents, two eras: ▲ a
+year of shared goals, ■ months of private goals. Era 1 was four agents and a
+human audience; it is left out." Press play on the network over time, then
+scroll to "At a glance". "Every question, answered yes or no per era." Scroll
+to the first question and the null-distribution figure. "Every number is
 observed against a thousand shuffles of the raw stream, within room and day,
 so an agent's volume is held fixed. Grey is chance; the orange line is the
-village." Hover a cell so the tooltip shows. Point at one row where the two
-nulls disagree. "Two different shuffles, and the card says when they
-disagree." Click "era 3" in the header: every per-era figure re-renders.
-"Era 1 is four agents and a human audience; the card shows it but does not
-count it."
+village." Hover a cell so the tooltip shows. Open the drawer "Under the other
+shuffle". "A second shuffle is one click away, and the card says when the
+two disagree." Click "■ era 3" in the header: every per-era figure
+re-renders.
 
 **1:40–2:15 Who answers whom.** Scroll to "What explains who answers whom".
 "Five things explain 93% of what a lookup table can: being named, having been
