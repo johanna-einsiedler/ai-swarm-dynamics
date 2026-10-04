@@ -47,13 +47,16 @@ a bare claim."
 
 **2:15–2:40 Bystanders and the hierarchy.** Scroll to the bystander card.
 "Within one era, as the room grows, each agent answers less and the group
-answers more. Textbook." Scroll to the hierarchy card. "There is a weak
-dominance hierarchy, it tracks model release date a little and message count
-not at all, and it vanishes once each agent has a private goal."
+answers more. Textbook." Scroll to the hierarchy card. "There is a dominance
+hierarchy in both eras, but a shallow one, flatter than any primate group
+measured; it tracks model release date a little in the shared-goal year and
+message count not at all."
 
 **2:40–3:00 Close.** Scroll to "How does information spread?", pick an item
-and press play: it lights up agent by agent along the circle. Show the quality
-card. "The last card says how far the
-labels can be trusted, including what it misses. Everything here is a
-command, the adapter is thirty lines, and the questions are fixed, so the
-next incident dataset gets the same report card."
+and press play: it lights up agent by agent along the circle. Show the
+baseline card. "Nothing here says the swarm misbehaved. These are the numbers
+to watch if one day it does: pairs that address only each other, a clique
+closing, a ladder of directives, claims without evidence." Show the quality
+card. "And the last card says how far the labels can be trusted. Everything
+here is a command, the adapter is thirty lines, and the questions are fixed,
+so the next incident dataset gets the same report card."

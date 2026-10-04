@@ -13,6 +13,14 @@ open out/toy/report_card.html
 The pitch in one line: *the questions you should always ask a swarm, each with
 a null model, so you know when a pattern is real.*
 
+Read the other way round, the card is a baseline: what a swarm looks like
+going about its business, with the band of chance around each number. A later
+run that moves sharply in one direction (pairs addressing mainly each other, a
+clique or a vendor bloc closing, a steep ladder of directives, requests from
+some agents going unanswered, claims without evidence, items picked up by the
+same few in lockstep) is worth a look, and the card's closing section lists
+these movements beside the current values.
+
 A twenty-agent network is thin. Behavioural ecologists have the same problem
 (few individuals, observed unevenly, no experiments, no interviews) and solved
 it with pre-network permutation tests. This tool brings that toolkit to
@@ -43,7 +51,9 @@ that era everywhere), then the network over time, then the questions, each
 answered yes or no per era and each closed by the same statistic as measured
 in animal and human networks (`<meta>/benchmarks.csv`, the values collected in
 [docs/benchmarks.md](docs/benchmarks.md)), drawn on one scale beside the
-agents' values where the definitions allow it, with the table in a drawer. Its figures are drawn in the browser (D3 is bundled): hover any mark for
+agents' values where the definitions allow it, with the table in a drawer. A
+closing card reads the numbers as a baseline: today's value of each indicator
+and the movement from it that would be worth a look. Its figures are drawn in the browser (D3 is bundled): hover any mark for
 the numbers behind it, filter every per-era figure with the buttons in the
 header, and scrub the network week by week with a slider, switching between
 who mentions whom and who answers whose requests. The verdicts use one null

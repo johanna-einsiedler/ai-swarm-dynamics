@@ -335,7 +335,7 @@ def intro_card(intro, groups, msgs, group):
     """The data and its eras with their markers; a dropped era is simply not there."""
     if intro and Path(intro).exists():
         text = Path(intro).read_text()
-        paras = text if intro.endswith(".html") else "".join(f"<p>{_links(p.strip())}</p>" for p in text.split("\n\n") if p.strip())
+        paras = text if intro.endswith(".html") else "".join(f"<h3>{esc(p.strip()[3:])}</h3>" if p.strip().startswith("## ") else f"<p>{_links(p.strip())}</p>" for p in text.split("\n\n") if p.strip())
     else:
         paras = f"<p>A transcript of {len(msgs):,} messages by {msgs.actor.nunique()} agents over {msgs.day.nunique()} active days, read as a social network: who addresses whom, who answers whom, who picks things up from whom.</p>"
     rows = pd.DataFrame(
@@ -717,6 +717,12 @@ def lead_vs_rank(d, group, drop, agents):
     }
 
 
+def _spell_days(days):
+    """0.04 days is 'about an hour', 0.3 days '7 hours', 1.0 day and more stays in days."""
+    hours = days * 24
+    return "about an hour" if hours < 1.5 else f"{hours:.0f} hours" if days < 1 else f"{days:.1f} days"
+
+
 def diffusion_card(d, ad, lr):
     title, anchor = "How does information spread?", "diffusion"
     if not (d / "diffusion_items.csv").exists():
@@ -730,7 +736,7 @@ def diffusion_card(d, ad, lr):
         sp, kinds = ad["speed"], ad["kinds"]
         verdict = (
             f"<b>{len(ad['items']):,}</b> items spread to {MIN_AD}+ agents over the whole record ({', '.join(f'{v:,} {k}s' for k, v in sorted(kinds.items(), key=lambda kv: -kv[1]))}). "
-            f"The median item reaches a second adopter <b>{sp['second']:.1f} days</b> after the first and half of its adopters within <b>{sp['half']:.1f} days</b>; {sp['within_week']:.0%} of items have finished spreading within a week."
+            f"The median item reaches a second adopter <b>{_spell_days(sp['second'])}</b> after the first and half of its adopters within <b>{_spell_days(sp['half'])}</b>; {sp['within_week']:.0%} of items have finished spreading within a week."
         )
         if ad["originators"]:
             top = ad["originators"][0]
@@ -834,6 +840,74 @@ def time_card(d, has_timeline, group, lab, drop):
     body = '<p class="meaning">Every agent is assigned a place on the circle in the order of joining, so a tie across the circle is a tie between an old agent and a new one. The network is built from mentions: an agent naming another in a message, with @ or by name; the second button switches to who answers whose requests. The slider moves through the weeks, and hollow dots are agents not active in the window.</p>'
     body += "<h3>Who mentions whom, week by week</h3>" + _fig("timeline") + goal_type_section(d, group, lab, drop)
     return _card(title, "", body, anchor), (title, _tag("info", "start here"), anchor)
+
+
+WATCH = [  # indicator: its name, what a sharp move from the baseline would look like, what that could point to
+    ("reciprocity", "mentions returned", "a jump well beyond both shuffles, carried by a few pairs", "closed loops: pairs that mainly address each other"),
+    ("same_family_share", "own-kind share", "rising above chance in every era", "coordination along vendor lines"),
+    ("partner_selectivity", "partner selectivity", "rising above its null across the swarm", "attention narrowing to a few partners"),
+    ("transitivity", "clique closure", "rising above its null", "a subset that talks mostly to itself"),
+    ("steepness", "dominance steepness", "a steep ladder appearing, compliance concentrated on one sender", "one agent directing, a subset complying"),
+    ("answering", "answering", "anyone-answers falling while the room is stable, or falling for particular askers", "requests from outside a group going unanswered"),
+    ("backed", "backed claims", "the backed share falling", "more claims of work done that cannot be checked"),
+    ("spread", "spread of items", "a fixed few always first and the same set following within minutes while the rest never adopt", "coordinated adoption inside a subset"),
+    ("leaders", "who leads adoption", "the leader set steepening beyond the volume null and lining up with the dominance order", "a subset steering what the others pick up"),
+]
+
+
+def _backed_share(d):
+    resp = _load_all(d, "responses")
+    if resp is None or "backed" not in resp.columns:
+        return None
+    done = helpful(resp)
+    return float(done.backed.mean()) if len(done) else None
+
+
+def baseline_card(data, group, lab, null, backed):
+    """The card read as a baseline: today's value of each indicator beside the movement from it that would be worth a look."""
+    title, anchor = "Reading this card as a baseline", "baseline"
+    now = {}
+    N = data.get("nulls")
+    if N:
+        for key in ("reciprocity", "same_family_share", "partner_selectivity", "transitivity"):
+            rows = [r for r in N["table"] if r["statistic"] == key and r["null"] == null]
+            if rows:
+                now[key] = "; ".join(f"{lab(r['group'])} {r['observed']:.3f} ({r['null_mean']:.3f} by chance)" for r in rows)
+    H = data.get("hierarchy")
+    if H:
+        rows = [r for r in H["table"] if r["statistic"] == "steepness" and str(r["group"]).startswith(group.split("_")[0])]  # the eras, not the leader episodes
+        if rows:
+            now["steepness"] = "; ".join(f"{lab(r['group'])} {r['observed']:.3f} ({r['null_mean']:.3f} by chance)" for r in rows)
+    Hp = data.get("helping")
+    if Hp and Hp.get("bystander"):
+        parts = []
+        for e, c in pd.DataFrame(Hp["bystander"]).groupby("era", sort=True):
+            c = c.sort_values("size", key=lambda s: s.map({k: i for i, k in enumerate(SIZE_LABELS)}))
+            parts.append(f"{lab(f'{group} {e}')} anyone answers {c.p_any_agent_responds.iloc[0]:.0%} to {c.p_any_agent_responds.iloc[-1]:.0%} and a given agent {c.p_each_agent_responds.iloc[0]:.0%} to {c.p_each_agent_responds.iloc[-1]:.0%} as the room grows from {c['size'].iloc[0]} to {c['size'].iloc[-1]} agents")
+        now["answering"] = "; ".join(parts)
+    if backed is not None:
+        now["backed"] = f"{backed:.0%} of answers and reported actions carry something checkable"
+    Df = data.get("diffusion")
+    if Df and Df.get("adoptions"):
+        A, sp = Df["adoptions"], Df["adoptions"]["speed"]
+        top = A["originators"][0] if A["originators"] else None
+        now["spread"] = f"{len(A['items']):,} items; a second adopter after {_spell_days(sp['second'])}, half of the adopters within {_spell_days(sp['half'])}" + (f"; {esc(top['agent'])} is first for {top['share_first']:.0%} of items" if top else "")
+    sm = Df.get("summary") if Df else None
+    if sm and sm.get("steepness") is not None:
+        now["leaders"] = f"leader-follower steepness {sm['steepness']:.3f} against {sm['steepness_volume_null']:.3f} with the order drawn by posting volume (p = {sm['steepness_volume_p']:.3f})" + (f"; lead score against dominance rank, Spearman {Df['lead_rank']['rho']:+.2f}" if Df.get("lead_rank") else "")
+    rows = [(name, now[key], move, means) for key, name, move, means in WATCH if key in now]
+    if not rows:
+        return None
+    body = (
+        '<p class="meaning">Nothing on this card is a verdict on the swarm\'s conduct: the numbers are what this swarm looks like going about its business, with the band of chance drawn around each, and that makes them a baseline. '
+        "A later run of the same swarm, or a new swarm under the same scaffolding, that moves sharply in one of the directions below is worth a look, because that is what coordination inside a subset of agents, or one agent capturing the others, would do to these statistics.</p>"
+    )
+    body += _table(pd.DataFrame(rows, columns=["indicator", "now", "a sharp move would look like", "which could point to"]))
+    body += (
+        '<p class="meaning">The yardstick is the null band and the range across eras, not the number itself: the eras on this card show how far roster size and the kind of goal move the same statistics for benign reasons, so a shift counts within a regime, outside the band of its own shuffle, and with no matching entry in the shock log. '
+        "And the card reads structure, not content: coordination written into the text of messages, in channels the card is not given, or in the timing of messages is beyond it, and it does not yet break answering down by who asked or test whether the same subset adopts items together. Those are the next indicators to add.</p>"
+    )
+    return _card(title, "", body, anchor), (title, _tag("info", "what to watch"), anchor)
 
 
 def quality_card(d, validation):
@@ -958,7 +1032,7 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
     cards = [time_card(d, data["timeline"] is not None, group, lab, drop)] + network_cards(d, group, lab, drop, thin_set, null, n_perm, bench, data["networks"]) + [hierarchy_card(d, group, lab, drop, thin_set, bench)]
     und = data["helping"]["undirected"] if data["helping"] else None
     ad, lr = (data["diffusion"]["adoptions"], data["diffusion"]["lead_rank"]) if data["diffusion"] else (None, None)
-    cards += helping_cards(d, group, lab, drop, bench, und) + [evidence_card(d), diffusion_card(d, ad, lr), quality_card(d, validation)]
+    cards += helping_cards(d, group, lab, drop, bench, und) + [evidence_card(d), diffusion_card(d, ad, lr), baseline_card(data, group, lab, null, _backed_share(d)), quality_card(d, validation)]
     cards = [c for c in cards if c]
     if bench:
         data["bench"] = bench.payload  # filled while the cards were built
@@ -975,7 +1049,7 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
 <main>
 {intro_html}
 {cards[0][0]}
-<article class="card" id="glance"><h2>Network Dynamics: How do agents interact with each other and how do the dynamics compare to other social networks?</h2><p class="meaning">Each question is answered yes or no per {esc(group)} against the null model: yes, the pattern is there beyond chance; no in grey, it is indistinguishable from chance; no in orange, it is weaker than chance would give. Each card ends with the same statistic as measured in animal and human networks.</p><ul class="glance">{glance}</ul></article>
+<article class="card" id="glance"><h2>Network Dynamics: How do agents interact with each other and how do the dynamics compare to other social networks?</h2><p class="meaning">Each question is answered yes or no per {esc(group)} against the null model: yes, the pattern is there beyond chance; no in grey, it is indistinguishable from chance; no in orange, it is weaker than chance would give. Each card ends with the same statistic as measured in animal and human networks. Read together the numbers are a baseline for this swarm; the last card but one says which movements from it would be worth a look.</p><ul class="glance">{glance}</ul></article>
 {"".join(c for c, _ in cards[1:])}
 </main>
 <footer>Generated by swarm-sna. Null models follow Bejder et al. 1998 and Farine 2017; dominance measures follow de Vries et al. 2006 and Shizuka &amp; McDonald 2012. Figures drawn with D3 (Mike Bostock, ISC licence).</footer>
