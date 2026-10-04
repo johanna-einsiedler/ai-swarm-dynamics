@@ -3,6 +3,7 @@
 # deliverables into examples/village-results/ (out/ is gitignored; the data is not redistributed).
 cd "$(dirname "$0")/.."
 set -e
+.venv/bin/swarm-sna report out/village --permutations 1000   # also saves the null draws the card's histograms need
 .venv/bin/swarm-sna helping out/village --bootstraps 300
 .venv/bin/swarm-sna hierarchy out/village --by era --permutations 1000
 .venv/bin/swarm-sna trends out/village

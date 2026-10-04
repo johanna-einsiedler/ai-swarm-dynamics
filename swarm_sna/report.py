@@ -1,4 +1,5 @@
 """`swarm-sna report`: the fixed battery, each statistic with its null distribution."""
+import json
 from pathlib import Path
 
 import numpy as np
@@ -83,6 +84,11 @@ def run(in_dir, n_perm=1000, group="era", seed=0, kinds=("at", "name")):
     table["permutations"] = n_perm
     table.to_csv(in_dir / f"report_{group}.csv", index=False)
     figure(table, draws, groups, in_dir / f"report_{group}_nulls.png")
+    # The null draws themselves, for the report card's histograms.
+    nested = {}
+    for (null, stat, g), d in draws.items():
+        nested.setdefault(null, {}).setdefault(stat, {})[g] = [round(float(v), 4) for v in d]
+    (in_dir / f"report_{group}_draws.json").write_text(json.dumps(nested))
     figures.networks(obs, stream.names, dict(zip(agents.agent, agents.family)), groups, in_dir / f"network_{group}.png")
     hwi = half_weight_index(events)
     hwi.to_csv(in_dir / "association_hwi.csv", index=False)

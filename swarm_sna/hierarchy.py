@@ -120,7 +120,7 @@ def analyse(c, events, agents, n_perm=1000, seed=0):
     stats = pd.DataFrame(rows, columns=["statistic", "observed", "null_mean", "null_lo", "null_hi", "p"])
     extra = {
         "agents": n, "contests": len(c), "compliance": won.mean(),
-        "rank_vs_release_date": _spearman(rank.davids_score, rank.release_date.astype("int64").where(rank.release_date.notna())),
+        "rank_vs_release_date": _spearman(rank.davids_score, rank.release_date.map(lambda t: np.nan if pd.isna(t) else t.value)),
         "rank_vs_messages": _spearman(rank.davids_score, rank.messages),
     }
     return rank, (stats, extra)
