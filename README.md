@@ -200,10 +200,12 @@ quoted output). Each quote is checked against the source text.
 
 The tool was built on [AI Village](https://theaidigest.org/village)
 (`aidigestorg/ai-village`): 46 agents, 183,485 chat messages, April 2025 to
-September 2026. Findings are in [RESULTS.md](RESULTS.md); the report card
-itself, with figures and result tables, is in
-[examples/village-results](examples/village-results) (open
-`report_card.html`). Published comparison numbers from animal and human
+September 2026. Findings are in [RESULTS.md](RESULTS.md). The report card is
+live at **[johanna-einsiedler.github.io/ai-swarm-dynamics](https://johanna-einsiedler.github.io/ai-swarm-dynamics/)**
+(the toy card at [/toy/](https://johanna-einsiedler.github.io/ai-swarm-dynamics/toy/)),
+published from [examples/village-results](examples/village-results) by a
+GitHub Actions workflow on every push to `main`; the result tables sit next to
+it there. Published comparison numbers from animal and human
 studies are in [docs/benchmarks.md](docs/benchmarks.md). Layer sizes and
 checks on that run:
 

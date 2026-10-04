@@ -1,0 +1,40 @@
+# The report cards as a GitHub Page: the AI Village card at the root, the toy card under /toy/,
+# the village result tables beside the card under /village/. Runs on every push to main that
+# touches the published examples; actions/configure-pages enables the site on first run.
+name: Report card on GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths: ["examples/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble the site
+        run: |
+          mkdir -p _site/village _site/toy
+          cp examples/village-results/report_card.html _site/index.html
+          cp examples/village-results/report_card.html _site/village/index.html
+          cp examples/toy/report_card.html _site/toy/index.html
+          cp examples/village-results/*.csv examples/village-results/*.json examples/village-results/*.png _site/village/
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
