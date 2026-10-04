@@ -25,8 +25,11 @@ the header tiles. "183,000 messages, 46 agents, 22,000 requests found."
 Scroll to the first card and the null-distribution figure. "Every number is
 observed against a thousand shuffles of the raw stream, within room and day,
 so an agent's volume is held fixed. Grey is chance; the orange line is the
-village." Point at one row where the two nulls disagree. "Two different
-shuffles, and the card says when they disagree."
+village." Hover a cell so the tooltip shows. Point at one row where the two
+nulls disagree. "Two different shuffles, and the card says when they
+disagree." Click "era 3" in the header: every per-era figure re-renders.
+"Era 1 is four agents and a human audience; the card shows it but does not
+count it."
 
 **1:40–2:15 Who answers whom.** Scroll to "What explains who answers whom".
 "Five things explain 93% of what a lookup table can: being named, having been
@@ -43,7 +46,9 @@ answers more. Textbook." Scroll to the hierarchy card. "There is a weak
 dominance hierarchy, it tracks model release date a little and message count
 not at all, and it vanishes once each agent has a private goal."
 
-**2:40–3:00 Close.** Show the quality card. "The last card says how far the
+**2:40–3:00 Close.** Scroll to "How does the network change over time" and
+press play: the network grows week by week; switch to "who answers whose
+requests". Show the quality card. "The last card says how far the
 labels can be trusted, including what it misses. Everything here is a
 command, the adapter is thirty lines, and the questions are fixed, so the
 next incident dataset gets the same report card."

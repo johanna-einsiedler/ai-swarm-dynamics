@@ -27,6 +27,7 @@ multi-agent transcripts.
 | Do agents have preferred partners? Do ties close into cliques? | same | no |
 | How does the network change over time? | per-period networks, weekly series | no |
 | Does information spread along ties? | order-of-acquisition diffusion test on links, file names and terms | no |
+| Who picks things up first, and who follows? | adoption network: credit from each adopter to earlier adopters; lead scores against random and volume-weighted order | no |
 | Is there a dominance hierarchy, and does it track capability or talkativeness? | directives and compliance; David's score, steepness | yes |
 | What explains who answers whom? | reciprocity ladder: nested models scored against a lookup table | yes |
 | Is there a bystander effect? | response rate against group size, within era and goal | yes |
@@ -35,6 +36,14 @@ multi-agent transcripts.
 Each card gives a verdict (above, below or within chance), the numbers, a
 figure, and a drawer of the quotes behind the labels. A final card reports how
 far the labels themselves can be trusted.
+
+The card is one HTML file that works offline. Its figures are drawn in the
+browser (D3 is bundled): hover any mark for the numbers behind it, filter every
+per-era figure with the buttons in the header, and scrub the network week by
+week with a slider, switching between who mentions whom and who answers whose
+requests. A group whose median day has fewer than six agents (`--min-agents`)
+is shown in every table but left out of the verdicts: a network statistic on
+four nodes has nothing to say.
 
 ## Install
 
@@ -74,8 +83,8 @@ swarm-sna run --adapter jsonl --data path/to/dir --out out/mine --llm    # all q
 | `helping` | request-by-agent table, reciprocity ladder, bystander curve |
 | `hierarchy` | dominance from directives and compliance |
 | `trends` | weekly series, per-quarter networks, goal-type breakdown |
-| `diffusion` | order-of-acquisition test: does who adopts next follow ties to earlier adopters |
-| `card` | assembles everything in the directory into `report_card.html` |
+| `diffusion` | order-of-acquisition test: does who adopts next follow ties to earlier adopters; then the adoption network, who leads and who follows |
+| `card` | assembles everything in the directory into `report_card.html`, one interactive page |
 
 A new data source needs one module in `swarm_sna/adapters/` with a
 `build(data_dir, meta_dir)` that returns `(events, agents)` in the common
@@ -104,7 +113,9 @@ structure survives (Bejder et al. 1998; Farine & Whitehead 2015; Farine 2017).
 One thousand permutations, statistic recomputed on each. Both network nulls
 fix every agent's volume, so volume statistics (degree, Gini) are constant by
 construction and are reported without a null. The two network nulls can
-disagree; the card shows both and says when they do.
+disagree; the card shows both and says when they do. `report` saves the draws
+(`report_<group>_draws.json`) and the card draws them as histograms with the
+observed value marked; without the file it shows the null's 95% band instead.
 
 ## Evidence behind every label
 
@@ -165,13 +176,17 @@ To reproduce: request access to the dataset, download the small tables into
   roster, prompt, tool and hours change. A change across one of those is not
   emergent behaviour.
 - **Eras are confounded with size.** The village grew from 4 to 28 agents, so
-  group-size effects are only read within an era.
+  group-size effects are only read within an era. Era 1 (106 days, four agents
+  at a time, humans in the chat) is too thin for a network statistic; the card
+  shows its rows but does not count them.
 - **Validation is thin.** The mention sample was adjudicated by a model, not a
   person (`rater` column in `validation/mentions.csv`). The question and
   overlap samples are unchecked.
 - **Diffusion is a weak test in a shared chat.** Every agent sees every
   message, so ties do not gate access to information as they do in an animal
   group; the test only asks whether attention ties predict who adopts next.
+  An item has few adoptions, so single-item tests are weak and the pooled rank
+  and combined z carry the evidence.
 - **Not built:** agents' memories as a perceived network, and a second real
   dataset.
 

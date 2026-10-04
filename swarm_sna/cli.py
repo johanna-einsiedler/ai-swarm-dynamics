@@ -93,7 +93,7 @@ def cmd_trends(args):
 def cmd_card(args):
     from . import card
 
-    card.run(args.dir, title=args.title, group=args.by, validation=args.validation)
+    card.run(args.dir, title=args.title, group=args.by, validation=args.validation, min_agents=args.min_agents)
 
 
 def cmd_run(args):
@@ -110,7 +110,7 @@ def cmd_run(args):
         cmd_helping(argparse.Namespace(dir=args.out, bootstraps=300, seed=args.seed))
         cmd_hierarchy(argparse.Namespace(dir=args.out, by="era", meta=args.meta, permutations=args.permutations, seed=args.seed))
         cmd_trends(argparse.Namespace(dir=args.out, meta=args.meta))
-    cmd_card(argparse.Namespace(dir=args.out, title=args.title, by="era", validation="validation"))
+    cmd_card(argparse.Namespace(dir=args.out, title=args.title, by="era", validation="validation", min_agents=args.min_agents))
 
 
 def cmd_diffusion(args):
@@ -187,6 +187,7 @@ def main():
     c.add_argument("--title", default=None)
     c.add_argument("--by", default="era", choices=["era", "goal_id"])
     c.add_argument("--validation", default="validation", help="directory with hand-checked samples, if any")
+    c.add_argument("--min-agents", type=int, default=6, help="a group whose median day has fewer agents than this is shown but not judged")
     c.set_defaults(func=cmd_card)
 
     a = sub.add_parser("run", help="everything in one go: extract, (label), report, analyses, report card")
@@ -198,6 +199,7 @@ def main():
     a.add_argument("--workers", type=int, default=10)
     a.add_argument("--permutations", type=int, default=1000)
     a.add_argument("--title", default=None)
+    a.add_argument("--min-agents", type=int, default=6, help="a group whose median day has fewer agents than this is shown on the card but not judged")
     a.add_argument("--seed", type=int, default=0)
     a.set_defaults(func=cmd_run)
 

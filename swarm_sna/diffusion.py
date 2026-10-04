@@ -2,11 +2,21 @@
 
 An item is a distinctive token (a URL, a file or tool name, a backticked term)
 that several agents come to use. For each item, the agents are ordered by first
-use. The statistic is how much tie weight each adopter had to the agents who
-adopted before it, summed over adopters (Franz & Nunn 2009; Hoppitt & Laland
-2013, OADA). The null permutes the order of adoption among the same agents, so
-who adopts is fixed and only the order is tested: if ties carry information,
-later adopters should be the ones connected to earlier ones.
+use. At each adoption after the first, the adopter is compared with the agents
+that had not yet adopted: its rank among them by tie weight to those who already
+had (0 = least tied, 1 = most tied). The statistic is the mean rank over
+adoptions, 0.5 under random order. This is the order-of-acquisition idea of
+Franz & Nunn (2009) and Hoppitt & Laland (2013, OADA) as a rank test. The null
+permutes the order of adoption among the same agents, so who adopts is fixed
+and only the order is tested: if ties carry information, the next adopter should
+be among the candidates most tied to the earlier ones.
+
+(The total tie weight among adopters, which an earlier version summed over
+adopters, is the same for every order; it cannot be tested.)
+
+The second half builds the adoption network itself: who picks things up first
+and who follows, against two nulls (random order, and order drawn in proportion
+to posting volume while the item spread).
 """
 import re
 from pathlib import Path
@@ -75,15 +85,27 @@ def tie_matrix(mentions, names, start, end):
     return W
 
 
+def mean_rank(orders, S):
+    """orders: (P, n) adopter indices, one row per adoption order. -> (P,) mean rank of each adopter
+    among the agents still to adopt, by tie weight to those who already had; 0.5 under random order."""
+    n = orders.shape[1]
+    M = S[orders[:, :, None], orders[:, None, :]]  # ties between adopters, rows and columns in adoption order
+    C = np.cumsum(M, axis=2)  # C[:, i, k - 1] = ties of adopter i to the first k adopters
+    ranks = []
+    for k in range(1, n - 1):  # the last adoption has no rival left
+        c = C[:, k:, k - 1]  # candidates still to adopt; column 0 is the one that did
+        me, others = c[:, :1], c[:, 1:]
+        ranks.append(((others < me).sum(1) + 0.5 * (others == me).sum(1)) / others.shape[1])
+    return np.mean(ranks, axis=0)
+
+
 def oada(order, W, rng, n_perm=N_PERM):
-    """order: adopter indices in adoption order. -> (observed, null mean, null sd, p one-sided)."""
-    n = len(order)
-
-    def stat(o):
-        return sum(W[o[k], o[:k]].sum() + W[o[:k], o[k]].sum() for k in range(1, n))  # ties in either direction to earlier adopters
-
-    obs = stat(order)
-    null = np.array([stat(rng.permutation(order)) for _ in range(n_perm)])
+    """order: adopter indices in adoption order. -> (observed, null mean, null sd, p one-sided, z)."""
+    S = W + W.T  # a tie in either direction counts
+    np.fill_diagonal(S, 0)
+    orders = np.vstack([order] + [rng.permutation(order) for _ in range(n_perm)])
+    vals = mean_rank(orders, S)
+    obs, null = vals[0], vals[1:]
     sd = null.std()
     return obs, null.mean(), sd, ((null >= obs).sum() + 1) / (n_perm + 1), (obs - null.mean()) / sd if sd > 0 else np.nan
 
@@ -145,6 +167,8 @@ def adoption_network(orders, names, rng, n_perm=300, by_volume=True):
 
 def leaders(in_dir, fu, items, events, agents, rng, n_perm=300):
     orders = adoption_orders(fu, items, agents, events)
+    if not orders:
+        return None
     names = sorted({a for _, _, actors, _ in orders for a in actors})
     W, lead, null_lead, steep, null_steep = adoption_network(orders, names, rng, n_perm)
     mu, sd = np.nanmean(null_lead, 0), np.nanstd(null_lead, 0)
@@ -173,6 +197,16 @@ def _spearman(x, y):
     return x[ok].rank().corr(y[ok].rank()) if ok.sum() > 3 else np.nan
 
 
+ITEM_COLUMNS = ["item", "adopters", "first_adopter", "first", "spread_days", "observed", "null_mean", "null_sd", "z", "p"]
+
+
+def _nothing(in_dir, why):
+    """Nothing spread: write the item table and the summary empty, so the card says 'not testable' rather than 'not run'."""
+    pd.DataFrame(columns=ITEM_COLUMNS).to_csv(in_dir / "diffusion_items.csv", index=False)
+    pd.DataFrame([{"items": 0}]).to_csv(in_dir / "diffusion_summary.csv", index=False)
+    print(f"{why}; wrote {in_dir}/diffusion_items.csv, diffusion_summary.csv (empty)")
+
+
 def run(in_dir, n_perm=N_PERM, seed=0):
     in_dir = Path(in_dir)
     events = pd.read_parquet(in_dir / "events.parquet")
@@ -182,13 +216,11 @@ def run(in_dir, n_perm=N_PERM, seed=0):
     code = {a: i for i, a in enumerate(names)}
     fu = first_uses(events)
     if fu.empty:
-        print("no traceable tokens (links, file names, backticked terms) in this transcript; nothing written")
-        return
+        return _nothing(in_dir, "no traceable tokens (links, file names, backticked terms) in this transcript")
     items = select_items(fu)
     print(f"{len(fu):,} first uses of {fu.item.nunique():,} tokens; {len(items)} items with {MIN_ADOPTERS}-{MAX_ADOPTERS} adopters spread over {MIN_SPREAD_DAYS}-{MAX_SPREAD_DAYS} days")
     if items.empty:
-        print("no token spread to enough agents to test; nothing written")
-        return
+        return _nothing(in_dir, "no token spread to enough agents to test")
     rng = np.random.default_rng(seed)
     rows = []
     for item, meta in items.iterrows():
@@ -199,24 +231,34 @@ def run(in_dir, n_perm=N_PERM, seed=0):
             continue
         obs, mu, sd, p, z = oada(idx, W, rng, n_perm)
         rows.append({"item": item, "adopters": len(idx), "first_adopter": order.actor.iloc[0], "first": meta["first"], "spread_days": meta.spread_days, "observed": obs, "null_mean": mu, "null_sd": sd, "z": z, "p": p})
-    if not rows:
-        print("no item had adopters with prior ties; nothing written")
-        return
-    t = pd.DataFrame(rows)
+    t = pd.DataFrame(rows, columns=ITEM_COLUMNS)
     t.to_csv(in_dir / "diffusion_items.csv", index=False)
-    z = t.z.dropna()
-    share = (t.p < 0.05).mean()
-    pooled = z.mean() * np.sqrt(len(z))  # Stouffer
-    print(f"\n1. Does adoption follow existing ties? {len(t)} items tested against {n_perm} random adoption orders each")
-    print(f"   items where adoption order follows ties (p < 0.05): {share:.1%} (5% expected by chance)")
-    print(f"   mean z {z.mean():+.2f}; Stouffer combined z {pooled:+.1f}")
-    figures.diffusion(t, in_dir / "fig_diffusion.png")
+    summary = {"items": len(t), "mean_rank": np.nan, "share_p_below_05": np.nan, "mean_z": np.nan, "stouffer_z": np.nan}
+    if t.empty:
+        print("\n1. Does adoption follow existing ties? No item had adopters with prior ties, so there is nothing to test.")
+    else:
+        z = t.z.dropna()
+        share = (t.p < 0.05).mean()
+        pooled = z.mean() * np.sqrt(len(z))  # Stouffer
+        summary.update(mean_rank=t.observed.mean(), share_p_below_05=share, mean_z=z.mean(), stouffer_z=pooled)
+        print(f"\n1. Does adoption follow existing ties? {len(t)} items tested against {n_perm} random adoption orders each")
+        print(f"   mean rank of the next adopter among the agents still to adopt, by ties to earlier adopters: {t.observed.mean():.3f} (0.5 by chance)")
+        print(f"   items where adoption order follows ties (p < 0.05): {share:.1%} (5% expected by chance)")
+        print(f"   mean z {z.mean():+.2f}; Stouffer combined z {pooled:+.1f}")
+        print("   strongest cascades:")
+        print(t.nsmallest(8, "p")[["item", "adopters", "first_adopter", "spread_days", "observed", "z", "p"]].round(3).to_string(index=False))
+        figures.diffusion(t, in_dir / "fig_diffusion.png")
 
-    # 2. The adoption network itself: who leads, who follows.
-    lead, edges, (steep, s_mu, s_lo, s_hi, s_p), (_, u_mu, u_lo, u_hi, u_p), n_items = leaders(in_dir, fu, items, events, agents, rng, n_perm=min(n_perm, 500))
+    # 2. The adoption network itself: who leads, who follows. It needs no ties, so it is built even when nothing above was testable.
+    res = leaders(in_dir, fu, items, events, agents, rng, n_perm=min(n_perm, 500))
+    if res is None:
+        pd.DataFrame([summary]).to_csv(in_dir / "diffusion_summary.csv", index=False)
+        print(f"\n2. The adoption network: no item with three or more adopters present from the start; nothing to build\n\nwrote {in_dir}/diffusion_items.csv, diffusion_summary.csv")
+        return
+    lead, edges, (steep, s_mu, s_lo, s_hi, s_p), (_, u_mu, u_lo, u_hi, u_p), n_items = res
     lead.to_csv(in_dir / "diffusion_leaders.csv", index=False)
     edges.to_csv(in_dir / "diffusion_edges.csv", index=False)
-    rd = lead.release_date.astype("int64").where(lead.release_date.notna())
+    rd = lead.release_date.map(lambda d: np.nan if pd.isna(d) else pd.Timestamp(d).value)
     msgs = lead.messages.astype(float)
     dom = pd.Series(np.nan, index=lead.index)
     ranks = sorted(in_dir.glob("hierarchy_ranks_*.csv"))
@@ -239,6 +281,6 @@ def run(in_dir, n_perm=N_PERM, seed=0):
     print("   most following:")
     print(lead.sort_values("lead_score").head(5)[cols].round(2).to_string(index=False))
     figures.leaders(lead, in_dir / "fig_diffusion_leaders.png")
-    pd.DataFrame([{"items": len(t), "share_p_below_05": share, "mean_z": z.mean(), "stouffer_z": pooled, "network_items": n_items, "steepness": steep, "steepness_random_null": u_mu, "steepness_random_p": u_p,
-                   "steepness_volume_null": s_mu, "steepness_volume_p": s_p}]).to_csv(in_dir / "diffusion_summary.csv", index=False)
+    summary.update(network_items=n_items, steepness=steep, steepness_random_null=u_mu, steepness_random_p=u_p, steepness_volume_null=s_mu, steepness_volume_p=s_p)
+    pd.DataFrame([summary]).to_csv(in_dir / "diffusion_summary.csv", index=False)
     print(f"\nwrote {in_dir}/diffusion_items.csv, diffusion_leaders.csv, diffusion_edges.csv, diffusion_correlates.csv, diffusion_summary.csv, fig_diffusion.png, fig_diffusion_leaders.png")
