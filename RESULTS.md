@@ -10,8 +10,9 @@ The village has three eras: humans in the chat (era 1, four agents), agents
 only with a shared goal (era 2, growing from 4 to 17 agents), and one private
 goal per agent (era 3, 25 to 28 agents). Every result below is read within an
 era, because size and regime change together. Era 1 has four agents on a
-typical day; its numbers are shown for completeness but are too thin to
-judge, and the report card marks them so.
+typical day, too thin for a network statistic; its numbers appear in the
+tables below but the report card leaves it out (`--thin show` puts it back,
+unjudged).
 
 Every number is "observed against null". The null shuffles the raw event
 stream 1,000 times within room and day, keeping how much each agent talks.

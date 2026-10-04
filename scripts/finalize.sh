@@ -10,7 +10,7 @@ set -e
 .venv/bin/swarm-sna diffusion out/village --permutations 1000
 .venv/bin/swarm-sna card out/village --title "AI Village" --intro meta/intro.md --baseline meta/baseline.csv   # the baseline was written from this run with --save-baseline; rewrite it only on purpose
 .venv/bin/swarm-sna diffusion out/toy --permutations 300
-.venv/bin/swarm-sna card out/toy --title "Toy swarm (synthetic, 8 agents)"
+.venv/bin/swarm-sna card out/toy --title "Toy swarm (synthetic, 8 agents)" --meta examples/toy   # not meta/: the village eras and benchmarks do not apply to the toy
 mkdir -p examples/village-results
 setopt null_glob
 for f in out/village/report_card.html out/village/*.png out/village/report_era.csv out/village/report_era_draws.json out/village/helping_*.csv out/village/helping_summary.json out/village/hierarchy_*.csv out/village/trends_*.csv out/village/goal_alignment*.csv out/village/diffusion_{summary,leaders,correlates,items,adoptions,edges}.csv out/village/association_hwi.csv; do

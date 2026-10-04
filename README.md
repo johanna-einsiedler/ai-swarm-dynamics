@@ -33,15 +33,16 @@ multi-agent transcripts.
 | Is interaction more reciprocal than chance? | mention network vs two nulls | no |
 | Do agents favour their own kind (model family)? | same | no |
 | Do agents have preferred partners? Do ties close into cliques? | same | no |
-| How does the network change over time? | per-period networks, weekly series | no |
+| How does the network change over time? | the mention and help networks week by week; response rates by kind of goal | no |
 | How does information spread? | every link, file name and term that reached 4+ agents, replayed over the network; how fast items spread and who is first; the adoption network and its leaders against random and volume-weighted order, and against dominance rank | no |
 | Is there a dominance hierarchy, and does it track capability or talkativeness? | directives and compliance; David's score, steepness | yes |
 | What explains who answers whom? | being named first; then, among undirected asks, answer rates by reciprocity, cost and bystanders and the share of who answers they explain | yes |
 | Is there a bystander effect? | response rate against group size, within era and goal | yes |
 | Are claims of work done backed by something checkable? | verbatim evidence per response | yes |
 
-Each card gives a verdict (above, below or within chance), the numbers, a
-figure, and a drawer of the quotes behind the labels. A final card reports how
+Each card answers yes or no per era against its null (no in orange when the
+pattern is below chance), then gives the numbers, a figure, and a drawer of the
+quotes behind the labels. A final card reports how
 far the labels themselves can be trusted.
 
 The card is one HTML file that works offline. It opens with the data and its
@@ -235,8 +236,8 @@ To reproduce: request access to the dataset, download the small tables into
   emergent behaviour.
 - **Eras are confounded with size.** The village grew from 4 to 28 agents, so
   group-size effects are only read within an era. Era 1 (106 days, four agents
-  at a time, humans in the chat) is too thin for a network statistic; the card
-  shows its rows but does not count them.
+  at a time, humans in the chat) is too thin for a network statistic and is
+  left out of the card (`--thin show` puts it back, unjudged).
 - **Validation is thin.** The mention sample was adjudicated by a model, not a
   person (`rater` column in `validation/mentions.csv`). The question and
   overlap samples are unchecked.
