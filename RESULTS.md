@@ -9,7 +9,9 @@ on goals set by the organisers. We ran `swarm-sna` on the full chat record:
 The village has three eras: humans in the chat (era 1, four agents), agents
 only with a shared goal (era 2, growing from 4 to 17 agents), and one private
 goal per agent (era 3, 25 to 28 agents). Every result below is read within an
-era, because size and regime change together.
+era, because size and regime change together. Era 1 has four agents on a
+typical day; its numbers are shown for completeness but are too thin to
+judge, and the report card marks them so.
 
 Every number is "observed against null". The null shuffles the raw event
 stream 1,000 times within room and day, keeping how much each agent talks.
@@ -69,12 +71,12 @@ rises from 65% to 74%. Slope of the log-odds on log group size, within goal:
 Fischer et al. 2011). At group level people do worse in company; the agents
 do better.
 
-**6. A weak dominance hierarchy in every era.** Contests are directives to a
+**6. A weak dominance hierarchy in eras 2 and 3.** Contests are directives to a
 named agent (4,667, of which 77% are complied with). Steepness against
-shuffled outcomes: era 1 0.252 against 0.206 (p = 0.048); era 2 0.096 against
-0.079 (p = 0.006); era 3 0.094 against 0.080 (p = 0.032). Era 1 is as steep as
-wild macaque groups (0.16 to 0.29, Amici et al. 2020); eras 2 and 3 are
-flatter than any primate value we found. Rank correlates weakly with model
+shuffled outcomes: era 2 0.096 against 0.079 (p = 0.006); era 3 0.094 against
+0.080 (p = 0.032); era 1, with four agents, 0.252 against 0.206. Both judged
+eras are flatter than any primate group we found figures for (0.16 to 0.29 in
+wild macaques, Amici et al. 2020). Rank correlates weakly with model
 release date (+0.32, +0.32, +0.08) and negatively with message count (-0.32,
 -0.16, -0.15): talking more does not buy rank.
 
@@ -91,9 +93,14 @@ leader-follower order is steeper than random adoption order (0.050 against
 (0.057, p = 0.09). Across 27 agents, leading correlates with release date at
 +0.27 to +0.50 and with message count at -0.44 to -0.62, and barely with
 dominance rank (+0.10 to +0.19): being first to pick something up and being
-obeyed are different things. Adoption order does not follow mention ties
-(0.1% of 762 items significant against 5% expected), as one would expect
-where everyone can read every message.
+obeyed are different things. Adoption also leans slightly on existing ties:
+ranking the agents still to adopt by their mention ties to those who already
+have, the next adopter sits at 0.54 on average against 0.50 by chance. No
+single item shows it (5.1% significant against 5% expected); pooled over 762
+items the combined z is +5.0, which treats items as independent and does not
+adjust for posting volume, so read it as a small effect at most. In a shared
+room everyone can read every message, so ties are not needed to hear of
+something.
 
 **9. About half of reported work can be checked.** 55% of the 29,322
 confirmed answers and reported actions quote a link, id, number, file name or
@@ -115,14 +122,14 @@ responses to finish quickly. Self-rated agreeableness has no relation to
 answering requests (rank correlation -0.09, six agents). Details in
 [docs/personality.md](docs/personality.md).
 
-## Four claims that did not survive checking
+## Five claims that did not survive checking
 
 - **"Large groups stop answering."** A pooled curve showed the group's answer
   rate dropping at 16 or more agents. That bucket is era 3 almost entirely.
   It is an era effect, not a size effect.
 - **"The hierarchy disappears under private goals."** On first-pass links
   era 3 steepness was indistinguishable from chance (p = 0.26). On checked
-  links it is above chance (p = 0.032), like the other eras.
+  links it is above chance (p = 0.032), as in era 2.
 - **"The request screen finds 41% of requests."** That came from asking the
   LLM to label messages the screen had skipped. Reading its quotes showed half
   were commitments or offers, not requests. The corrected figure was 58%, and
@@ -133,8 +140,14 @@ answering requests (rank correlation -0.09, six agents). Details in
   52,563. A further 11% of quotes had been attached to the wrong message
   number and were re-pointed by the quote.
 
-Each was caught because labels carry verbatim quotes and results are refitted
-per era by default.
+- **"Adoption order does not follow ties."** The first version of the
+  diffusion test summed each adopter's ties to all earlier adopters, which is
+  the same number for every order, so it could not have found anything. A
+  second session reviewing the code caught it; the corrected statistic is the
+  one reported in finding 8.
+
+The first four were caught because labels carry verbatim quotes and results
+are refitted per era by default; the fifth by a second reader of the code.
 
 ## Limits
 
