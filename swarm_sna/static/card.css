@@ -37,6 +37,8 @@ details { border-top:1px solid var(--line); margin-top:10px; padding-top:8px; } 
 code { background:var(--within-bg); padding:1px 5px; border-radius:4px; font-size:12.5px; }
 footer { color:var(--muted); font-size:12.5px; padding-bottom:40px; }
 
+.nojs { color:#8a2f0a; background:var(--below-bg); border-radius:8px; padding:8px 12px; font-size:13px; margin:0 0 18px; }
+
 /* ---- interactive figures */
 .groupbar { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin: 0 0 18px; font-size:13px; color:var(--muted); }
 .groupbar .ctl-label { margin-right:4px; }

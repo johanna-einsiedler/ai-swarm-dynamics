@@ -530,6 +530,7 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
 <title>Swarm report card</title><style>{_static("card.css")}</style></head><body>
 <header><h1>Swarm report card</h1><p class="sub">{esc(title or d.name)} &middot; {esc(str(msgs.day.min()))} to {esc(str(msgs.day.max()))}</p>
 <div class="tiles">{"".join(f'<div class="tile"><b>{v}</b><span>{esc(k)}</span></div>' for v, k in tiles)}</div>
+<p class="nojs">The figures on this page are drawn in the browser. If they are missing, the viewer has blocked the page's script (GitHub's file view and most in-app previews do): open the file in a web browser.</p>
 <div class="groupbar" id="groupbar"></div></header>
 <main>
 <article class="card"><h2>At a glance</h2><p class="meaning">The questions worth asking of any group of agents. A pattern only counts if it beats a null model: the raw event stream is shuffled {n_perm:,} times in ways that keep how much each agent talks, and the statistic is recomputed on each shuffle. Two shuffles are used. One reassigns who spoke each message; the other reassigns whom each message addressed. They can disagree, and when they do the card says so.{thin_text}</p><ul class="glance">{glance}</ul></article>

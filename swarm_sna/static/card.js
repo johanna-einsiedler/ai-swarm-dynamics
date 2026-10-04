@@ -3,6 +3,7 @@
    declare data-groups; everything else renders once and on resize. */
 (function () {
   "use strict";
+  document.querySelectorAll(".nojs").forEach(e => e.remove());  // the script runs, so the warning for viewers that block it goes
   const D = JSON.parse(document.getElementById("card-data").textContent);
   const P = D.palette;
   const state = { group: "all" };
@@ -135,12 +136,16 @@
     const links = linkData.filter(l => byId.has(l.source) && byId.has(l.target)).map(l => Object.assign({}, l));
     const wmax = d3.max(links, l => l.w) || 1, smax = d3.max(nodes, size) || 1;
     const r = d => 4 + 15 * Math.sqrt(size(d) / smax);
-    const k = Math.min(w, h);  // forces scale with the panel, so a few agents still fill it
+    const k = Math.min(w, h), n = nodes.length;  // forces scale with the panel, so a few agents still fill it, and ease off as agents multiply
     const sim = d3.forceSimulation(nodes)
       .force("link", d3.forceLink(links).id(d => d.id).distance(l => k * (0.16 + 0.34 * (1 - l.w / wmax))).strength(l => 0.15 + 0.6 * l.w / wmax))
-      .force("charge", d3.forceManyBody().strength(-2 * k)).force("center", d3.forceCenter(w / 2, h / 2 + 8)).force("collide", d3.forceCollide(d => r(d) + 7)).stop();
+      .force("charge", d3.forceManyBody().strength(-2 * k * Math.min(1, 12 / n))).force("center", d3.forceCenter(w / 2, h / 2 + 8)).force("collide", d3.forceCollide(d => r(d) + 7)).stop();
     for (let i = 0; i < 300; i++) sim.tick();
-    nodes.forEach(d => { d.x = Math.max(r(d) + 16, Math.min(w - r(d) - 16, d.x)); d.y = Math.max(r(d) + 30, Math.min(h - r(d) - 8, d.y)); });
+    // Fit the layout to the panel by scaling and centring it, never by clamping: clamping piles the outer agents onto the edge.
+    const xs = d3.extent(nodes, d => d.x), ys = d3.extent(nodes, d => d.y), padX = 52, padTop = 36, padBottom = 16;
+    const s = Math.min((w - 2 * padX) / Math.max(1, xs[1] - xs[0]), (h - padTop - padBottom) / Math.max(1, ys[1] - ys[0]), 1.5);
+    const offX = padX + ((w - 2 * padX) - (xs[1] - xs[0]) * s) / 2, offY = padTop + ((h - padTop - padBottom) - (ys[1] - ys[0]) * s) / 2;
+    nodes.forEach(d => { d.x = offX + (d.x - xs[0]) * s; d.y = offY + (d.y - ys[0]) * s; });
     g.append("text").attr("x", 8).attr("y", 16).attr("fill", P.ink).attr("font-size", 12).attr("font-weight", 600).text(title);
     if (arrows) g.append("defs").append("marker").attr("id", "arrow").attr("viewBox", "0 -4 8 8").attr("refX", 8).attr("markerWidth", 7).attr("markerHeight", 7).attr("orient", "auto")
       .append("path").attr("d", "M0,-3.5L8,0L0,3.5").attr("fill", P.muted);
@@ -154,8 +159,8 @@
     const node = g.append("g").selectAll("circle").data(nodes).join("circle").attr("cx", d => d.x).attr("cy", d => d.y).attr("r", r)
       .attr("fill", d => familyColour(d.family)).attr("stroke", "#fff").attr("stroke-width", 2);
     const labelled = new Set(nodes.slice().sort((a, b) => size(b) - size(a)).slice(0, nodes.length <= 14 ? 14 : 6).map(d => d.id));
-    g.append("g").selectAll("text").data(nodes.filter(d => labelled.has(d.id))).join("text").attr("x", d => d.x).attr("y", d => d.y - r(d) - 4)
-      .attr("text-anchor", "middle").attr("font-size", 10.5).attr("fill", P.ink).text(d => d.id);
+    g.append("g").selectAll("text").data(nodes.filter(d => labelled.has(d.id))).join("text").attr("x", d => Math.max(50, Math.min(w - 50, d.x))).attr("y", d => d.y - r(d) - 4)
+      .attr("text-anchor", "middle").attr("font-size", 10.5).attr("fill", P.ink).text(d => d.id.length > 22 ? d.id.slice(0, 21) + "…" : d.id);
     if (edgeTip) g.append("g").selectAll("line").data(links).join("line")
       .attr("x1", l => l.source.x).attr("y1", l => l.source.y).attr("x2", l => l.target.x).attr("y2", l => l.target.y).attr("stroke", "transparent").attr("stroke-width", 10)
       .on("pointermove", (e, l) => showTip(e, `${l.source.id} → ${l.target.id}`, edgeTip(l))).on("pointerleave", hideTip);
