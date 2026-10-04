@@ -269,7 +269,22 @@ def diffusion_card(d):
     body += '<p class="meaning">Read with care in a shared chat room: every agent sees every message, so access to an item is not gated by ties the way it is in an animal group. The test asks whether attention ties predict who picks something up next, not whether they were needed to hear of it.</p>'
     top = t.nsmallest(8, "p")[["item", "adopters", "first_adopter", "spread_days", "z", "p"]].rename(columns={"spread_days": "days to spread", "first_adopter": "first adopter"})
     body += _drawer("The eight items whose spread leans most on ties", _table(top, {"days to spread": ".0f", "z": "+.2f", "p": ".3f"}))
-    return _card(title, verdict, body, anchor), (title, _tag(o, label), anchor)
+    chips = _tag(o, label)
+    if (d / "diffusion_leaders.csv").exists():
+        lead = pd.read_csv(d / "diffusion_leaders.csv")
+        sm = pd.read_csv(d / "diffusion_summary.csv").iloc[0]
+        steep = "steeper than volume alone predicts" if sm.steepness_volume_p < ALPHA and sm.steepness > sm.steepness_volume_null else "no steeper than volume alone predicts"
+        body += "<h3>The adoption network: who picks things up first, and who follows</h3>"
+        body += f'<p class="meaning">Adoption defines its own network. For each item, every adopter after the first hands one unit of credit, split evenly, to the agents who had it before. An agent\'s lead score is (credit received - credit given) / total: +1 is always first, -1 always after others. Across {int(sm.network_items)} items the leader-follower ordering is {steep} (steepness {sm.steepness:.3f}; null with order drawn in proportion to posting volume {sm.steepness_volume_null:.3f}, p = {sm.steepness_volume_p:.3f}; plain random order {sm.steepness_random_null:.3f}, p = {sm.steepness_random_p:.3f}).</p>'
+        body += _img(d / "fig_diffusion_leaders.png")
+        if (d / "diffusion_correlates.csv").exists():
+            c = pd.read_csv(d / "diffusion_correlates.csv").rename(columns={"Unnamed: 0": "leading, measured as"})
+            body += '<p class="meaning">Does leading go with capability, talkativeness or rank? Rank correlations across agents. The two nulls bracket the truth: plain random order ignores that heavy posters reach everything sooner; volume-weighted order assumes an agent posting ten times as much adopts ten times sooner.</p>'
+            body += _table(c, {k: "+.2f" for k in c.columns if k.startswith("vs")})
+        show = lead.sort_values("lead_score", ascending=False)[["agent", "led", "followed", "lead_score", "z_random_order", "z"]].rename(columns={"lead_score": "lead score", "z_random_order": "z, random order", "z": "z, volume-weighted"})
+        body += _drawer("Every agent's lead score", _table(show, {"led": ".0f", "followed": ".0f", "lead score": "+.2f", "z, random order": "+.1f", "z, volume-weighted": "+.1f"}))
+        chips += " " + _tag("within" if "no steeper" in steep else "above", "leader-follower order: " + ("beyond volume" if "no steeper" not in steep else "explained by volume"))
+    return _card(title, verdict, body, anchor), (title, chips, anchor)
 
 
 def trends_card(d, group):
