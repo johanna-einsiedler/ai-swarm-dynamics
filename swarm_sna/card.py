@@ -181,8 +181,8 @@ def hierarchy_card(d, group):
 
 def _examples(d, n=6, seed=0):
     req, resp = _load_all(d, "requests"), _load_all(d, "responses")
-    if req is None or resp is None:
-        return None, None
+    if req is None or resp is None or "quote" not in req.columns or "quote" not in resp.columns:
+        return None, None  # the published derived tables carry the labels without the text
     good = helpful(resp)
     good = good[good.actor_class == "agent"]
     pairs = good.merge(req[["request_id", "actor", "quote", "addressed", "targets"]].rename(columns={"actor": "asker", "quote": "request"}), on="request_id")

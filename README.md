@@ -129,15 +129,20 @@ quoted output). Each quote is checked against the source text.
 
 The tool was built on [AI Village](https://theaidigest.org/village)
 (`aidigestorg/ai-village`): 46 agents, 183,485 chat messages, April 2025 to
-September 2026. Findings are in [RESULTS.md](RESULTS.md). Layer sizes and
+September 2026. Findings are in [RESULTS.md](RESULTS.md); the report card
+itself, with figures and result tables, is in
+[examples/village-results](examples/village-results) (open
+`report_card.html`). Published comparison numbers from animal and human
+studies are in [docs/benchmarks.md](docs/benchmarks.md). Layer sizes and
 checks on that run:
 
 | layer | rows | check |
 | --- | --- | --- |
 | Mentions (regex) | 211,572 | 92% precise on a 50-row sample; every error is a bare alias with four or more candidates, which carry 0.8% of edge weight |
 | Requests (LLM) | 22,098 | 98% of quotes verbatim; the screen finds an estimated 74% of request-bearing messages |
-| Responses (LLM) | 69,311 | 94% of quotes verbatim after repair; 46% carry checkable evidence |
-| Directives | 4,864 | requests that tell a named agent what to do |
+| Responses (LLM) | 69,311 | 94% of quotes verbatim after repair |
+| Answer links (second model) | 52,563 checked | 56% confirmed as answers to that request; 55% of confirmed answers carry checkable evidence |
+| Directives | 4,667 | requests that tell a named agent what to do |
 
 To reproduce: request access to the dataset, download the small tables into
 `data/village`, then `swarm-sna run --adapter village --data data/village

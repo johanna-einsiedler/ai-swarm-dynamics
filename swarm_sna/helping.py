@@ -239,13 +239,13 @@ def load_all(in_dir, name):
     return pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
 
 
-def run(in_dir, n_boot=500, seed=0):
+def run(in_dir, n_boot=500, seed=0, reuse_dyads=False):
     in_dir = Path(in_dir)
     cached = in_dir / "dyads.parquet"
     sources = [f for name in ("requests", "responses") for f in in_dir.glob(f"{name}*.parquet")]
-    if cached.exists() and sources and cached.stat().st_mtime > max(f.stat().st_mtime for f in sources):
+    if cached.exists() and (reuse_dyads or (sources and cached.stat().st_mtime > max(f.stat().st_mtime for f in sources))):
         d = pd.read_parquet(cached)
-        print("  dyads: reusing dyads.parquet (newer than the labels)")
+        print("  dyads: reusing dyads.parquet")
     else:
         events = pd.read_parquet(in_dir / "events.parquet")
         d = dyads(events, load_all(in_dir, "requests"), load_all(in_dir, "responses"))

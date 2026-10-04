@@ -75,7 +75,7 @@ def cmd_verify(args):
 def cmd_helping(args):
     from . import helping
 
-    helping.run(args.dir, n_boot=args.bootstraps, seed=args.seed)
+    helping.run(args.dir, n_boot=args.bootstraps, seed=args.seed, reuse_dyads=getattr(args, "reuse_dyads", False))
 
 
 def cmd_hierarchy(args):
@@ -165,6 +165,7 @@ def main():
     h = sub.add_parser("helping", help="who answers whose requests: dyad table, reciprocity ladder, bystander curve")
     h.add_argument("dir", nargs="?", default="out/village", help="directory written by extract and label")
     h.add_argument("--bootstraps", type=int, default=500)
+    h.add_argument("--reuse-dyads", action="store_true", help="use the dyads.parquet already in the directory (needed for the published derived tables, which carry no message text)")
     h.add_argument("--seed", type=int, default=0)
     h.set_defaults(func=cmd_helping)
 

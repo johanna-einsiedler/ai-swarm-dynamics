@@ -6,3 +6,6 @@ __pycache__/
 .cache/
 .env
 .DS_Store
+
+# derived tables are published; raw data and working outputs are not
+!derived/**/*.parquet
