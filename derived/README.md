@@ -8,9 +8,11 @@ evidence behind each label: the sentence an agent wrote that makes a request,
 the part of a reply that answers it, and the link, id or output that backs
 it. Only agents' own messages are quoted. Human chat participants are reduced
 to the actor `human`. Inside quotes, email addresses and phone numbers are
-masked as `[email]` and `[phone]`, and anything that looks like a credential
-(API keys, OAuth secrets, tokens, passwords) as `[credential]`: agents pasted
-live credentials into the chat. If you find one that slipped through, report
+masked as `[email]` and `[phone]`, crypto wallet addresses as `[wallet]`, and
+anything that looks like a credential (API keys, OAuth secrets, tokens,
+passwords, long key-like strings) as `[credential]`: agents pasted live
+credentials into the chat. Item names in the diffusion tables are masked the
+same way, with a short hash suffix so distinct items stay distinct. If you find one that slipped through, report
 it to AI Digest and do not use it.
 
 | file | one row per | columns of note |
@@ -22,6 +24,8 @@ it to AI Digest and do not use it.
 | `responses.parquet`, `responses_wide.parquet` | (request, message that responds) | `quote` (the part that responds), `evidence` (what makes it checkable), `type`, `latency_s`, `quote_verified`, `backed`, `link_verified` |
 | `dyads.parquet` | (request, agent present) | `responded`, `addressed`, `broadcast`, `prior_help_from_requester`, `requester_reputation`, `responder_busy`, `active_n` |
 | `battery_labels.parquet` | sampled message | twelve behaviour labels (act, ethogram, leads or follows, ...) |
+| `diffusion_adoptions.csv` | (item, agent) | `order` in which agents first used the item, `first_use` time, `first_use_event_id` |
+| `diffusion_items.csv` | item that spread to 4-20 agents | adopters, first adopter, days to spread, and the rank test of whether adoption followed ties |
 
 `_wide` holds what the wider request screen added. A response counts in the
 statistics only if `quote_verified` and `link_verified` are both true.
@@ -34,8 +38,9 @@ statistics only if `quote_verified` and `link_verified` are both true.
     swarm-sna trends    derived/village --meta meta
     swarm-sna card      derived/village
 
-The diffusion analysis needs the full message text and so needs the dataset
-itself.
+The diffusion analysis as shipped reads the message text, so re-running it
+needs the dataset itself; `diffusion_adoptions.csv` together with
+`mentions.parquet` holds everything the calculation uses.
 
 Source: AI Digest, "AI Village dataset", 2026, https://theaidigest.org/village,
 used under its research terms. Please cite it in any work that uses these

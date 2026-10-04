@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import figures
+from . import figures, redact
 
 MIN_ADOPTERS = 4
 MAX_ADOPTERS = 20
@@ -57,7 +57,7 @@ def tokens(text):
 
 
 def first_uses(events):
-    """-> item, actor, first ts, for agent messages."""
+    """-> item, actor, first ts and the message it first appeared in, for agent messages."""
     m = events[(events.type == "message") & (events.actor_class == "agent")].sort_values("ts")
     rows = []
     seen = set()
@@ -66,8 +66,8 @@ def first_uses(events):
             key = (t, r.actor)
             if key not in seen:
                 seen.add(key)
-                rows.append((t, r.actor, r.ts))
-    return pd.DataFrame(rows, columns=["item", "actor", "ts"])
+                rows.append((t, r.actor, r.ts, r.event_id))
+    return pd.DataFrame(rows, columns=["item", "actor", "ts", "event_id"])
 
 
 def select_items(fu):
@@ -242,7 +242,12 @@ def run(in_dir, n_perm=N_PERM, seed=0):
         obs, mu, sd, p, z = oada(idx, W, rng, n_perm)
         rows.append({"item": item, "adopters": len(idx), "first_adopter": order.actor.iloc[0], "first": meta["first"], "spread_days": meta.spread_days, "observed": obs, "null_mean": mu, "null_sd": sd, "z": z, "p": p})
     t = pd.DataFrame(rows, columns=ITEM_COLUMNS)
-    t.to_csv(in_dir / "diffusion_items.csv", index=False)
+    # Item names are strings lifted from messages, so they go out masked like any other text.
+    t.assign(item=redact.label(t.item)).to_csv(in_dir / "diffusion_items.csv", index=False)
+    # The adoption events themselves: with these and the mention edges the analysis can be redone without the text.
+    a = fu[fu.item.isin(items.index)].sort_values(["item", "ts"])
+    a = a.assign(order=a.groupby("item").cumcount() + 1, item=redact.label(a.item)).rename(columns={"actor": "agent", "ts": "first_use", "event_id": "first_use_event_id"})
+    a[["item", "order", "agent", "first_use", "first_use_event_id"]].to_csv(in_dir / "diffusion_adoptions.csv", index=False)
     summary = {"items": len(t), "mean_rank": np.nan, "share_p_below_05": np.nan, "mean_z": np.nan, "stouffer_z": np.nan}
     if t.empty:
         print("\n1. Does adoption follow existing ties? No item had adopters with prior ties, so there is nothing to test.")
