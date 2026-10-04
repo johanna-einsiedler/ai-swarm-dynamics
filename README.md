@@ -38,10 +38,12 @@ figure, and a drawer of the quotes behind the labels. A final card reports how
 far the labels themselves can be trusted.
 
 The card is one HTML file that works offline. It opens with the data and its
-eras (`--intro` takes a text file; `<meta>/eras.csv` gives each era a marker,
-a name and a description, and the marker then labels that era everywhere),
-then the network over time, then the questions, each answered yes or no per
-era. Its figures are drawn in the browser (D3 is bundled): hover any mark for
+eras (`--intro` takes a text file, with `[label](url)` links; `<meta>/eras.csv`
+gives each era a marker, a name and a description, and the marker then labels
+that era everywhere), then the network over time, then the questions, each
+answered yes or no per era and each closed by the same statistic as measured
+in animal and human networks (`<meta>/benchmarks.csv`, the values collected in
+[docs/benchmarks.md](docs/benchmarks.md)). Its figures are drawn in the browser (D3 is bundled): hover any mark for
 the numbers behind it, filter every per-era figure with the buttons in the
 header, and scrub the network week by week with a slider, switching between
 who mentions whom and who answers whose requests. One null is the default

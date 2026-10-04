@@ -112,7 +112,38 @@ def _drawer(summary, body):
 
 
 def _card(title, verdict, body, anchor):
-    return f'<article class="card" id="{anchor}"><h2>{esc(title)}</h2><p class="verdict">{verdict}</p>{body}</article>'
+    return f'<article class="card" id="{anchor}"><h2>{esc(title)}</h2>{f"<p class=verdict>{verdict}</p>" if verdict else ""}{body}</article>'
+
+
+def _links(text):
+    """Escaped text with [label](url) turned into links."""
+    import re
+
+    return re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r'<a href="\2">\1</a>', esc(text))
+
+
+def load_benchmarks(meta):
+    """<meta>/benchmarks.csv: published values of the same statistics in animal and human networks, per card."""
+    path = Path(meta) / "benchmarks.csv" if meta else None
+    return pd.read_csv(path, dtype=str).fillna("") if path is not None and path.exists() else None
+
+
+def _benchmarks(bench, card, agents_line=""):
+    """The comparison section for one card: the agents' own numbers, the comparability note, the published values."""
+    if bench is None:
+        return ""
+    b = bench[bench.card == card]
+    if b.empty:
+        return ""
+    notes = " ".join(b[b.kind == "note"].measure)
+    rows = b[b.kind == "value"]
+    body = f'<p class="meaning">{(agents_line + " ") if agents_line else ""}{esc(notes)}</p>'
+    if len(rows):
+        t = pd.DataFrame({"statistic": rows.measure, "setting": rows.setting, "value": rows.value, "source": [f"{s} {c}".strip() for s, c in zip(rows.source, rows.check)]})
+        body += _table(t)
+        if (rows.check == "†").any():
+            body += '<p class="meaning">† taken from a secondary summary rather than the paper itself.</p>'
+    return "<h3>Compared with animal and human networks</h3>" + body
 
 
 def _missing(title, command, anchor):
@@ -188,6 +219,7 @@ def networks_payload(msgs, mentions, agents, group, top=150):
     grp = msgs.set_index("event_id")[group]
     m = mentions[(mentions.actor_class == "agent") & mentions.kind.isin(("at", "name"))]
     m = m.assign(g=m.event_id.map(grp)).dropna(subset=["g"])
+    m["g"] = m.g.astype(grp.dtype)  # mentions outside the kept groups map to NaN, which would turn an integer era into "2.0"
     m = m[m.actor != m.target]
     fam = dict(zip(agents.agent, agents.family))
     out = {}
@@ -239,11 +271,11 @@ def timeline_payload(events, msgs, mentions, agents, group, req, resp):
 
 # ---------- cards
 
-def intro_card(intro, groups, drop, lab, msgs, n_perm, null, group):
-    """The data, its eras with their markers, and how the nulls work."""
+def intro_card(intro, groups, msgs, group):
+    """The data and its eras with their markers; a dropped era is simply not there."""
     if intro and Path(intro).exists():
         text = Path(intro).read_text()
-        paras = text if intro.endswith(".html") else "".join(f"<p>{esc(p.strip())}</p>" for p in text.split("\n\n") if p.strip())
+        paras = text if intro.endswith(".html") else "".join(f"<p>{_links(p.strip())}</p>" for p in text.split("\n\n") if p.strip())
     else:
         paras = f"<p>A transcript of {len(msgs):,} messages by {msgs.actor.nunique()} agents over {msgs.day.nunique()} active days, read as a social network: who addresses whom, who answers whom, who picks things up from whom.</p>"
     rows = pd.DataFrame(
@@ -251,18 +283,20 @@ def intro_card(intro, groups, drop, lab, msgs, n_perm, null, group):
             "": [g.get("marker", "") for g in groups], group: [f"{g['name']}" + (f" · {g['label']}" if g.get("label") else "") for g in groups],
             "period": [f"{g['first']} to {g['last']}" for g in groups], "agents overall": [g["agents"] for g in groups], "agents a day": [f"{g['median_active']:.0f}" for g in groups],
             "messages": [g["messages"] for g in groups], "what changed": [g.get("description", "") for g in groups],
-            "on this card": ["left out: too thin" if g["name"] in drop else "yes" for g in groups],
         }
     )
-    body = paras + f"<h3>The {group}s</h3>" + _table(rows, classes=["thin" if g["name"] in drop else "" for g in groups])
-    body += f'<p class="meaning">Every number on this card is observed against a null model: the raw event stream is shuffled {n_perm:,} times within room and day and the statistic is recomputed on each shuffle. The default shuffle is <b>{NULL_NAMES[null]}</b>, which {NULL_MEANING[null]}. The other shuffle, {NULL_NAMES[[k for k in NULL_NAMES if k != null][0]]}, is in each card\'s drawer. A pattern counts only if it beats the shuffles.'
-    if drop:
-        body += f" {esc(', '.join(lab(g) for g in sorted(drop)))}: fewer than six agents on a typical day, so a network statistic has nothing to say; left out of this card. The diffusion questions use the whole record."
-    body += "</p>"
-    return _card("The data", "", body, "data")
+    return _card("The data", "", paras + f"<h3>The {group}s</h3>" + _table(rows), "data")
 
 
-def network_cards(d, group, lab, drop, thin, null):
+def null_text(n_perm, null):
+    other = [k for k in NULL_NAMES if k != null][0]
+    return (
+        f'<p class="meaning">Every verdict on this card is observed against a null model: the raw event stream is shuffled {n_perm:,} times within room and day and the statistic is recomputed on each shuffle. '
+        f"The default shuffle is <b>{NULL_NAMES[null]}</b>, which {NULL_MEANING[null]}. The other shuffle, {NULL_NAMES[other]}, is in each card's drawer and behind the toggle below. A pattern counts only if it beats the shuffles.</p>"
+    )
+
+
+def network_cards(d, group, lab, drop, thin, null, n_perm, bench):
     path = d / f"report_{group}.csv"
     if not path.exists():
         return [_missing(q, "swarm-sna report", s) for s, q, _ in NETWORK_CARDS]
@@ -289,18 +323,24 @@ def network_cards(d, group, lab, drop, thin, null):
 
         body = f'<p class="meaning">{esc(meaning)} Null: {esc(NULL_NAMES[null])}.</p>' + _table(rows(main), raw=("p", ""), classes=["thin" if th else "" for th in main.thin])
         if i == 0:
-            body += _fig("nulls", grouped=True)
+            body += null_text(n_perm, null) + _fig("nulls", grouped=True)
         if i == 2:
             body += _fig("network", grouped=True)
         if len(alt):
             note = f'<p class="meaning">{esc(NULL_NAMES[other].capitalize())} {esc(NULL_MEANING[other])}. The two shuffles can disagree: a pattern can beat partner choice yet be explained by who talks how much, or the reverse.</p>'
             body += _drawer(f"Under the other shuffle ({NULL_NAMES[other]})", note + _table(rows(alt), raw=("p", ""), classes=["thin" if th else "" for th in alt.thin]))
+        agents_line = ""
+        if stat == "same_family_share" and len(judged):  # the human rows are observed over expected, so say ours the same way
+            agents_line = "Written the human way, cross-family mentions run at " + ", ".join(f"{(1 - r.observed) / (1 - r.null_mean):.0%} of chance in {lab(r.group)}" for r in judged.itertuples()) + "."
+        elif stat == "reciprocity" and len(judged):
+            agents_line = "The agents return " + ", ".join(f"{r.observed:.2f} of mention weight in {lab(r.group)} ({r.null_mean:.2f} expected)" for r in judged.itertuples()) + "."
+        body += _benchmarks(bench, stat, agents_line)
         chips = " ".join(_tag("thin", f"{lab(r.group)}: thin") if r.thin else _answer(lab(r.group), r.outcome == "above", r.outcome) for r in main.itertuples())
         out.append((_card(question, verdict, body, stat), (question, chips, stat)))
     return out
 
 
-def hierarchy_card(d, group, lab, drop, thin):
+def hierarchy_card(d, group, lab, drop, thin, bench):
     title, anchor = "Is there a dominance hierarchy?", "hierarchy"
     path = d / f"hierarchy_{group}.csv"
     if not path.exists():
@@ -334,6 +374,9 @@ def hierarchy_card(d, group, lab, drop, thin):
     if len(episodes):
         e = pd.DataFrame({"episode | window": episodes.group, "steepness": episodes.observed, "null mean": episodes.null_mean, "p": [_p(p) for p in episodes.p], "directives": episodes.contests})
         body += _drawer("Before, during and after an imposed leader", _table(e, raw=("p",)))
+    tt = main[main.statistic == "triangle_transitivity"]
+    agents_line = "The agents: steepness " + ", ".join(f"{r.observed:.3f} in {lab(r.group)}" for r in st.itertuples()) + (("; triangle transitivity " + ", ".join(f"{r.observed:.2f} in {lab(r.group)}" for r in tt.itertuples())) if len(tt) else "") + "."
+    body += _benchmarks(bench, "hierarchy", agents_line)
     chips = " ".join(_tag("thin", f"{lab(g)}: thin") if g in thin else _answer(lab(g), o == "above", o) for g, o in zip(st.group, outs))
     return _card(title, verdict, body, anchor), (title, chips, anchor)
 
@@ -357,7 +400,7 @@ def _exchange(r):
     )
 
 
-def helping_cards(d, group, lab, drop):
+def helping_cards(d, group, lab, drop, bench):
     t1, a1, t2, a2 = "What explains who answers whom?", "helping", "Is there a bystander effect?", "bystander"
     if not (d / "helping_ladder.csv").exists():
         return [_missing(t1, "swarm-sna label, then helping", a1), _missing(t2, "swarm-sna label, then helping", a2)]
@@ -378,6 +421,7 @@ def helping_cards(d, group, lab, drop):
     _, ex = _examples(d)
     if ex is not None and len(ex):
         body += _drawer(f"Evidence: {len(ex)} request-and-answer pairs, verbatim", "".join(_exchange(r) for r in ex.itertuples()))
+    body += _benchmarks(bench, "helping")
     cards = [(_card(t1, verdict, body, a1), (t1, _tag("info", f"model reaches {last.completeness:.0%} of the ceiling"), a1))]
 
     curve = pd.read_csv(d / "helping_bystander.csv")
@@ -393,6 +437,12 @@ def helping_cards(d, group, lab, drop):
     rows = curve.rename(columns={"size": "agents present", "p_each_agent_responds": "a given agent answers", "p_any_agent_responds": "anyone answers"}).assign(era=lambda x: x.era.map(lambda e: lab(f"{group} {e}")))
     body = '<p class="meaning">The bystander effect: the more others are present, the less likely any one of them is to help, even if the group as a whole still does. Broadcast requests only (asked of nobody in particular), compared within era, because group size and era are confounded across eras. Two curves: the chance that a given agent answers, and the chance that anyone does.</p>' + _fig("bystander", grouped=True)
     body += _drawer("The curve as a table", _table(rows, {"a given agent answers": ".0%", "anyone answers": ".0%"}))
+    kept = []  # the agents' own numbers, the way the laboratory reports them: the share of the small-group rate kept in the largest group
+    for e, c in curve.groupby("era", sort=True):
+        c = c.sort_values("size", key=lambda s: s.map({k: i for i, k in enumerate(SIZE_LABELS)}))
+        a, b = c.p_each_agent_responds.iloc[0], c.p_each_agent_responds.iloc[-1]
+        kept.append(f"{lab(f'{group} {e}')} a given agent answers {a:.0%} of broadcast requests at {c['size'].iloc[0]} agents and {b:.0%} at {c['size'].iloc[-1]} ({b / a:.0%} kept), while anyone answers {c.p_any_agent_responds.iloc[0]:.0%} and {c.p_any_agent_responds.iloc[-1]:.0%}")
+    body += _benchmarks(bench, "bystander", "In " + "; in ".join(kept) + "." if kept else "")
     cards.append((_card(t2, verdict, body, a2), (t2, _tag("yes" if yes else "no", label), a2)))
     return cards
 
@@ -468,12 +518,12 @@ def time_card(d, has_timeline, group, lab, drop):
         body += _drawer("The weekly series as a table", _table(w.assign(era=w.era.map(lambda e: lab(f"{group} {int(e)}") if pd.notna(e) else "")).rename(columns=lambda c: c.replace("_", " ")), {c.replace("_", " "): ".0%" for c in ("answered", "each_agent_responds", "compliance", "backed")} | {"requests per 100": ".1f"}))
     if not body:
         return _missing(title, "swarm-sna report, then trends", anchor)
-    body = '<p class="meaning">Start here. Every agent keeps its place on the circle, in order of joining, so a tie across the circle is a tie between old and new; the slider moves through the weeks. A pooled statistic over a long transcript mixes regimes, and the weekly series below shows whether a result is a property of the swarm or of one period.</p>' + body
+    body = '<p class="meaning">Every agent is assigned a place on the circle in the order of joining, so a tie across the circle is a tie between an old agent and a new one. The network is built from mentions: an agent naming another in a message, with @ or by name; the second button switches to who answers whose requests. The slider moves through the weeks, and hollow dots are agents not active in the window. Below, the weekly rates behind every pooled number: a pooled statistic over a long transcript mixes regimes, and the series show whether a result is a property of the swarm or of one period.</p>' + body
     if (d / "trends_goal_type.csv").exists():
         g = pd.read_csv(d / "trends_goal_type.csv")
         g = g[~g.era.map(lambda e: f"{group} {e}").isin(drop)].assign(era=lambda x: x.era.map(lambda e: lab(f"{group} {e}"))).rename(columns=lambda c: c.replace("_", " "))
         body += _drawer("Response rates by the kind of goal the swarm was given", _table(g, {c: ".0%" for c in g.columns if "respond" in c or "answered" in c}))
-    return _card(title, "What the swarm looked like, before any verdict.", body, anchor), (title, _tag("info", "start here"), anchor)
+    return _card(title, "", body, anchor), (title, _tag("info", "start here"), anchor)
 
 
 def quality_card(d, validation):
@@ -592,11 +642,12 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
         if "permutations" in rep.columns:
             n_perm = int(rep.permutations.iloc[0])
     data = payload(d, group, groups, amsgs, ev, agents, mentions, req, resp, drop, null)
-    cards = [time_card(d, data["timeline"] is not None, group, lab, drop)] + network_cards(d, group, lab, drop, thin_set, null) + [hierarchy_card(d, group, lab, drop, thin_set)]
-    cards += helping_cards(d, group, lab, drop) + [evidence_card(d), diffusion_card(d), quality_card(d, validation)]
+    bench = load_benchmarks(meta)
+    cards = [time_card(d, data["timeline"] is not None, group, lab, drop)] + network_cards(d, group, lab, drop, thin_set, null, n_perm, bench) + [hierarchy_card(d, group, lab, drop, thin_set, bench)]
+    cards += helping_cards(d, group, lab, drop, bench) + [evidence_card(d), diffusion_card(d), quality_card(d, validation)]
     cards = [c for c in cards if c]
-    glance = "".join(f'<li><a href="#{a}">{esc(t)}</a><span class="chips">{chips}</span></li>' for _, (t, chips, a) in cards)
-    intro_html = intro_card(intro, groups_all, drop, lab, msgs, n_perm, null, group)
+    glance = "".join(f'<li><a href="#{a}">{esc(t)}</a><span class="chips">{chips}</span></li>' for _, (t, chips, a) in cards[1:])
+    intro_html = intro_card(intro, groups, msgs, group)
     subtitle = f"{esc(title or d.name)} &middot; {esc(str(msgs.day.min()))} to {esc(str(msgs.day.max()))}"
     data_json = json.dumps(_clean(data), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")  # never closes the script element early
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -608,7 +659,7 @@ def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN
 <main>
 {intro_html}
 {cards[0][0]}
-<article class="card" id="glance"><h2>At a glance</h2><p class="meaning">The questions worth asking of any group of agents, each answered yes or no per {esc(group)} against the null model. Yes means the pattern is there beyond chance; no in orange means the pattern is weaker than chance would give, no in grey means it is indistinguishable from chance.</p><ul class="glance">{glance}</ul></article>
+<article class="card" id="glance"><h2>Network Dynamics: How do agents interact with each other and how do the dynamics compare to other social networks?</h2><p class="meaning">Each question is answered yes or no per {esc(group)} against the null model: yes, the pattern is there beyond chance; no in grey, it is indistinguishable from chance; no in orange, it is weaker than chance would give. Each card ends with the same statistic as measured in animal and human networks.</p><ul class="glance">{glance}</ul></article>
 {"".join(c for c, _ in cards[1:])}
 </main>
 <footer>Generated by swarm-sna. Null models follow Bejder et al. 1998 and Farine 2017; dominance measures follow de Vries et al. 2006 and Shizuka &amp; McDonald 2012. Figures drawn with D3 (Mike Bostock, ISC licence).</footer>

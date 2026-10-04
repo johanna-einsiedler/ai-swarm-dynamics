@@ -232,7 +232,6 @@
     const angle = i => Math.PI / 2 - 2 * Math.PI * i / n, xy = i => [cx + R * Math.cos(angle(i)), cy - R * Math.sin(angle(i))];
     svg.append("circle").attr("cx", cx).attr("cy", cy).attr("r", R).attr("fill", "none").attr("stroke", P.faint);
     const edgeLayer = svg.append("g"), nodeLayer = svg.append("g"), labelLayer = svg.append("g"), hitLayer = svg.append("g");
-    const table = d3.select(el).append("details"); table.append("summary").text("The strongest ties in this window, as a table"); const tbody = table.append("div").attr("class", "scroll").append("table");
 
     function draw() {
       const lo = Math.max(0, T.i - T.win + 1), hi = T.i;
@@ -271,10 +270,6 @@
         })
         .on("pointermove", (e, d) => showTip(e, d.id + " · " + d.family + (d.on ? "" : " · not active"), [[T.mode === "help" ? "answers received" : "mentions received", f2(d.in)], [T.mode === "help" ? "answers given" : "mentions sent", f2(d.out)], ["messages in window", int(d.msgs)]]))
         .on("pointerleave", () => { edgeLayer.selectAll("path").attr("stroke", P.ink).attr("stroke-opacity", e => 0.08 + 0.45 * e.w / wmax); labelLayer.selectAll("text").attr("opacity", 1); hideTip(); });
-      tbody.selectAll("*").remove();
-      const head = tbody.append("thead").append("tr"); ["from", "to", T.mode === "help" ? "answers" : "mention weight"].forEach(h => head.append("th").text(h));
-      const rows = tbody.append("tbody").selectAll("tr").data(shown.slice(0, 15)).join("tr");
-      rows.append("td").text(e => L.agents[e.s].id); rows.append("td").text(e => L.agents[e.t].id); rows.append("td").attr("class", "num").text(e => f2(e.w));
     }
     draw();
     familyLegend(el);
