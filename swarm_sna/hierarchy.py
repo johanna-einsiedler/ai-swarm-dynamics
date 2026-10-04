@@ -168,7 +168,21 @@ def run(in_dir, group="era", meta=None, n_perm=1000, seed=0):
 
     goals_path = Path(meta) / "goals.csv" if meta else None
     if goals_path and goals_path.exists():
-        for name, windows in episodes(pd.read_csv(goals_path, parse_dates=["start_time", "end_time"])):
+        goals = pd.read_csv(goals_path, parse_dates=["start_time", "end_time"])
+        leader = set(goals[goals.leader_imposed == 1].goal_id) if "leader_imposed" in goals.columns else set()
+        # The per-group numbers include the weeks in which the organisers imposed a leader; the same statistic without
+        # those weeks says whether they carry the result. The label must not start with the group name: the card reads
+        # rows that do as groups to judge, and this one belongs in the drawer with the episodes.
+        for g, cg in c.groupby(group):
+            inside = cg.goal_id.isin(leader)
+            if leader and inside.any():
+                rank, res = analyse(cg[~inside], events, agents, n_perm, seed)
+                if rank is not None:
+                    label = f"Imposed-leader weeks removed | {group} {g}"
+                    _print(f"{group} {g} without the {inside.sum():,} contests in imposed-leader goals", rank, res)
+                    ranks.append(rank.assign(group=label))
+                    tables.append(res[0].assign(group=label, **res[1]))
+        for name, windows in episodes(goals):
             print(f"\n=== imposed-leader episode: {name}")
             for label, a, b in windows:
                 cg = c[(c.ts >= a) & (c.ts < b)]

@@ -77,7 +77,11 @@ named agent (4,667, of which 77% are complied with). Steepness against
 shuffled outcomes: era 2 0.096 against 0.079 (p = 0.006); era 3 0.094 against
 0.080 (p = 0.032); era 1, with four agents, 0.252 against 0.206. Both judged
 eras are flatter than any primate group we found figures for (0.16 to 0.29 in
-wild macaques, Amici et al. 2020). Rank correlates weakly with model
+wild macaques, Amici et al. 2020). The weeks in which the organisers imposed
+a leader (an election week in January, a fine-tuned leader in late May and
+June; 10% of era 2's contests) do not carry the result: era 2 without them is
+0.102 against 0.083 (p = 0.02), and within those weeks alone steepness is at
+chance (0.062 against 0.061). Rank correlates weakly with model
 release date (+0.32, +0.32, +0.08) and negatively with message count (-0.32,
 -0.16, -0.15): talking more does not buy rank.
 

@@ -505,7 +505,8 @@ def hierarchy_card(d, group, lab, drop, thin, bench):
     episodes = t[~t.group.str.startswith(group.split("_")[0]) & (t.statistic == "steepness")]
     if len(episodes):
         e = pd.DataFrame({"episode | window": episodes.group, "steepness": episodes.observed, "null mean": episodes.null_mean, "p": [_p(p) for p in episodes.p], "directives": episodes.contests})
-        body += _drawer("Before, during and after an imposed leader", _table(e, raw=("p",)))
+        body += '<p class="meaning">Weeks in which the organisers imposed a leader are inside the era numbers above. The drawer shows those weeks on their own, with equally long windows before and after, and each era with the imposed-leader weeks removed.</p>'
+        body += _drawer("An imposed leader: before, during and after, and the era without those weeks", _table(e, raw=("p",)))
     tt = main[main.statistic == "triangle_transitivity"]
     agents_line = "The agents: steepness " + ", ".join(f"{r.observed:.3f} in {lab(r.group)}" for r in st.itertuples()) + (("; triangle transitivity " + ", ".join(f"{r.observed:.2f} in {lab(r.group)}" for r in tt.itertuples())) if len(tt) else "") + "."
     ours = {}
