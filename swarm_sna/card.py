@@ -1,11 +1,14 @@
-"""`swarm-sna card`: the report card. One self-contained HTML page.
+"""`swarm-sna card`: the report card. One self-contained, interactive HTML page.
 
 The fixed questions as cards, each with its verdict against a null model, the
-numbers, the figure, and a drawer of the verbatim evidence behind the labels.
-It is built from whatever the other commands have written to the directory; a
-question whose layer has not been run says which command would answer it.
+numbers, a figure drawn in the browser (D3, inlined, no network needed) and a
+drawer of the verbatim evidence behind the labels. It is built from whatever the
+other commands have written to the directory; a question whose layer has not
+been run says which command would answer it.
+
+A group (era) whose median day has fewer than `--min-agents` agents is shown but
+not judged: a network statistic on four nodes has nothing to say.
 """
-import base64
 import html
 import json
 from pathlib import Path
@@ -13,9 +16,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .helping import helpful
+from .figures import FAINT, INK, MUTED, NAMED_FAMILIES, NULL_FILL, OBSERVED, OTHER, SERIES
+from .helping import SIZE_LABELS, helpful
+from .report import LABELS as STAT_LABELS
+from .trends import SERIES as TREND_SERIES
 
 ALPHA = 0.05
+MIN_AGENTS = 6
+MIN_AD = 4
+STATIC = Path(__file__).parent / "static"
 NULL_NAMES = {"speaker": "shuffling who spoke", "target": "shuffling who was addressed"}
 NETWORK_CARDS = [
     ("reciprocity", "Is interaction more reciprocal than chance?", "Share of all mention weight that is matched in the opposite direction."),
@@ -32,9 +41,10 @@ LADDER_NOTE = {
     "lookup table": "ceiling: every combination of the above, tabulated",
 }
 FEATURE_NAMES = {"addressed": "addressed by name", "prior_help": "asker answered you before", "reputation": "asker answers others", "busy": "responder busy", "log_active_n": "agents present (log)"}
+CHIP_LABELS = {"above": "above chance", "below": "below chance", "within": "within chance", "unknown": "not testable", "thin": "too thin to judge", "mixed": "nulls disagree"}
+PALETTE = {"series": SERIES, "other": OTHER, "null": NULL_FILL, "observed": OBSERVED, "ink": INK, "muted": MUTED, "faint": FAINT, "grid": "#eceef1", "axis": "#c3c6cc"}
 
 esc = html.escape
-MIN_AD = 4
 
 
 def _p(p):
@@ -48,24 +58,23 @@ def _outcome(observed, null_mean, p):
 
 
 def _chip(outcome):
-    label = {"above": "above chance", "below": "below chance", "within": "within chance", "unknown": "not testable"}[outcome]
-    return f'<span class="chip {outcome}">{label}</span>'
+    return f'<span class="chip {outcome}">{CHIP_LABELS[outcome]}</span>'
 
 
-def _img(path, caption=""):
-    path = Path(path)
-    if not path.exists():
-        return ""
-    data = base64.b64encode(path.read_bytes()).decode()
-    cap = f"<figcaption>{esc(caption)}</figcaption>" if caption else ""
-    return f'<figure><img src="data:image/png;base64,{data}" alt="{esc(caption)}">{cap}</figure>'
+def _tag(outcome, text):
+    return f'<span class="chip {outcome}">{esc(text)}</span>'
 
 
-def _table(df, formats=None, raw=()):
+def _fig(kind, grouped=False):
+    """A placeholder the page's script fills with a D3 figure; `grouped` ones re-render when the group filter changes."""
+    return f'<div class="fig" data-fig="{kind}"{" data-groups=1" if grouped else ""}></div>'
+
+
+def _table(df, formats=None, raw=(), classes=None):
     formats = formats or {}
     head = "".join(f"<th>{esc(str(c))}</th>" for c in df.columns)
     body = ""
-    for row in df.itertuples(index=False):
+    for i, row in enumerate(df.itertuples(index=False)):
         cells = []
         for c, v in zip(df.columns, row):
             if c in raw:
@@ -76,7 +85,8 @@ def _table(df, formats=None, raw=()):
                 cells.append(f'<td class="num">{v:,}</td>')
             else:
                 cells.append(f"<td>{esc(str(v))}</td>")
-        body += "<tr>" + "".join(cells) + "</tr>"
+        cls = f' class="{classes[i]}"' if classes and classes[i] else ""
+        body += f"<tr{cls}>" + "".join(cells) + "</tr>"
     return f'<div class="scroll"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
 
 
@@ -88,10 +98,6 @@ def _card(title, verdict, body, anchor):
     return f'<article class="card" id="{anchor}"><h2>{esc(title)}</h2><p class="verdict">{verdict}</p>{body}</article>'
 
 
-def _tag(outcome, text):
-    return f'<span class="chip {outcome}">{esc(text)}</span>'
-
-
 def _missing(title, command, anchor):
     return _card(title, _chip("unknown") + f" This question needs a layer that has not been run. <code>{esc(command)}</code> would answer it.", "", anchor), (title, _tag("unknown", "not run"), anchor)
 
@@ -101,9 +107,101 @@ def _load_all(d, name):
     return pd.concat([pd.read_parquet(f) for f in files], ignore_index=True) if files else None
 
 
+def _thin_note(thin, groups):
+    hit = sorted(thin & set(groups))
+    return f' {_chip("thin")} {esc(", ".join(hit))}: shown, not judged.' if hit else ""
+
+
+# ---------- JSON payload helpers
+
+def _clean(v):
+    """Anything pandas or numpy hands back -> plain JSON values."""
+    if isinstance(v, dict):
+        return {str(k): _clean(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple, np.ndarray, pd.Series)):
+        return [_clean(x) for x in v]
+    if isinstance(v, (pd.Timestamp, np.datetime64)):
+        return None if pd.isna(v) else str(pd.Timestamp(v))[:19]
+    if isinstance(v, np.bool_):
+        return bool(v)
+    if isinstance(v, np.integer):
+        return int(v)
+    if isinstance(v, (float, np.floating)):
+        return None if np.isnan(v) else round(float(v), 5)
+    if v is pd.NaT or v is pd.NA:
+        return None
+    return v
+
+
+def _records(df):
+    return [_clean(r) for r in df.to_dict("records")]
+
+
+def group_info(msgs, group, min_agents):
+    """Size of each group: agents, days, and the median number of agents active per day, which decides `thin`."""
+    out = []
+    for g, m in msgs.groupby(group, sort=True):
+        daily = m.groupby("day").actor.nunique()
+        out.append({"name": f"{group} {g}", "agents": int(m.actor.nunique()), "median_active": float(daily.median()), "days": int(len(daily)), "messages": int(len(m)), "thin": bool(daily.median() < min_agents)})
+    return out
+
+
+def networks_payload(msgs, mentions, agents, group, top=150):
+    """The mention network per group: every node with its strengths, the strongest ties."""
+    grp = msgs.set_index("event_id")[group]
+    m = mentions[(mentions.actor_class == "agent") & mentions.kind.isin(("at", "name"))]
+    m = m.assign(g=m.event_id.map(grp)).dropna(subset=["g"])
+    m = m[m.actor != m.target]
+    fam = dict(zip(agents.agent, agents.family))
+    out = {}
+    for g, mg in m.groupby("g"):
+        e = mg.groupby(["actor", "target"]).weight.sum().reset_index()
+        ins, outs = e.groupby("target").weight.sum(), e.groupby("actor").weight.sum()
+        volume = msgs[msgs[group] == g].actor.value_counts()
+        nodes = sorted(set(e.actor) | set(e.target))
+        out[f"{group} {g}"] = {
+            "nodes": [{"id": a, "family": fam.get(a, "unknown"), "in": round(float(ins.get(a, 0)), 2), "out": round(float(outs.get(a, 0)), 2), "msgs": int(volume.get(a, 0))} for a in nodes],
+            "edges": [{"s": r.actor, "t": r.target, "w": round(float(r.weight), 2)} for r in e.nlargest(top, "weight").itertuples()],
+        }
+    return out
+
+
+def _week(days):
+    return pd.to_datetime(days).dt.to_period("W").dt.start_time.dt.strftime("%Y-%m-%d")
+
+
+def timeline_payload(events, msgs, mentions, agents, group, req, resp):
+    """Weekly edge lists for the mention network and, when the LLM layers exist, the help network;
+    agents in order of joining so the page can keep each one at a fixed place."""
+    m = msgs.assign(week=_week(msgs.day))
+    order = agents.sort_values("joined").agent.tolist()
+    order += sorted(set(msgs.actor) - set(order))
+    idx = {a: i for i, a in enumerate(order)}
+    fam = dict(zip(agents.agent, agents.family))
+    by_week = m.groupby("week")
+    active = {w: sorted(idx[a] for a in g.actor.unique()) for w, g in by_week}
+    messages = {w: {str(idx[a]): int(c) for a, c in g.actor.value_counts().items()} for w, g in by_week}
+    era = {w: _clean(g[group].mode().iloc[0]) if g[group].notna().any() else None for w, g in by_week}
+
+    def edges(df, src, dst):
+        e = df.groupby(["week", src, dst]).weight.sum().reset_index()
+        e = e[(e[src] != e[dst]) & e[src].isin(idx) & e[dst].isin(idx)]
+        return {w: [[idx[s], idx[t], round(float(v), 2)] for s, t, v in zip(g[src], g[dst], g.weight)] for w, g in e.groupby("week")}
+
+    mm = mentions[(mentions.actor_class == "agent") & mentions.kind.isin(("at", "name"))]
+    mention_edges = edges(mm.assign(week=_week(mm.day)), "actor", "target")
+    help_edges = None
+    if req is not None and resp is not None:
+        h = helpful(resp)
+        h = h[h.actor_class == "agent"].merge(req[["request_id", "actor"]].rename(columns={"actor": "target"}), on="request_id")
+        h = h.assign(day=h.event_id.map(events.set_index("event_id").day), weight=1.0).dropna(subset=["day"])
+        help_edges = edges(h.assign(week=_week(h.day)), "actor", "target") if len(h) else None
+    return {"periods": sorted(active), "agents": [{"id": a, "family": fam.get(a, "unknown")} for a in order], "active": active, "messages": messages, "era": era, "mentions": mention_edges, "help": help_edges}
+
+
 # ---------- cards
 
-def network_cards(d, group):
+def network_cards(d, group, thin):
     path = d / f"report_{group}.csv"
     if not path.exists():
         return [_missing(q, "swarm-sna report", s) for s, q, _ in NETWORK_CARDS]
@@ -111,38 +209,45 @@ def network_cards(d, group):
     out = []
     for i, (stat, question, meaning) in enumerate(NETWORK_CARDS):
         s = t[(t.statistic == stat) & t.null.isin(NULL_NAMES)]
-        s = s.assign(outcome=[_outcome(r.observed, r.null_mean, r.p) for r in s.itertuples()])
-        outcomes = set(s.outcome)
-        if len(outcomes) == 1:
+        s = s.assign(outcome=[_outcome(r.observed, r.null_mean, r.p) for r in s.itertuples()], thin=s.group.isin(thin))
+        judged = s[~s.thin]
+        outcomes = set(judged.outcome)
+        if not len(judged):
+            verdict = _chip("thin") + " Every group has too few agents a day to judge."
+        elif len(outcomes) == 1:
             o = outcomes.pop()
             verdict = _chip(o) + {"above": " In every group, under both nulls.", "below": " In every group, under both nulls.", "within": " Not distinguishable from chance in any group."}.get(o, "")
-            headline = o
         else:
             parts = []
-            for null, g in s.groupby("null", sort=False):
+            for null, g in judged.groupby("null", sort=False):
                 by = g.groupby("outcome", sort=False).group.agg(", ".join)
                 parts.append(f"<b>{NULL_NAMES[null].capitalize()}</b>: " + "; ".join(f"{_chip(o)} {esc(groups)}" for o, groups in by.items()))
             verdict = "It depends on the group and the null. " + " &nbsp; ".join(parts)
-            headline = "mixed"
+        verdict += _thin_note(thin, s.group)
         rows = pd.DataFrame(
             {
                 "group": s.group, "null": s.null.map(NULL_NAMES), "observed": s.observed, "null mean": s.null_mean,
-                "null 95% band": [f"[{a:.3f}, {b:.3f}]" for a, b in zip(s.null_lo, s.null_hi)], "p": [_p(p) for p in s.p], "": [_chip(o) for o in s.outcome],
+                "null 95% band": [f"[{a:.3f}, {b:.3f}]" for a, b in zip(s.null_lo, s.null_hi)], "p": [_p(p) for p in s.p],
+                "": [_chip("thin") if th else _chip(o) for o, th in zip(s.outcome, s.thin)],
             }
         )
-        body = f'<p class="meaning">{esc(meaning)}</p>' + _table(rows, raw=("p", ""))
+        body = f'<p class="meaning">{esc(meaning)}</p>' + _table(rows, raw=("p", ""), classes=["thin" if th else "" for th in s.thin])
         if i == 0:
-            body += _img(d / f"report_{group}_nulls.png", "Every statistic against the permuted event streams (grey) with the observed value marked.")
-        # At a glance: one chip per group, and say so when the two nulls disagree.
+            body += _fig("nulls", grouped=True)
+        if i == 2:
+            body += _fig("network", grouped=True)
         chips = []
         for g, rows_g in s.groupby("group", sort=False):
+            if g in thin:
+                chips.append(_tag("thin", f"{g}: thin"))
+                continue
             o = rows_g.outcome.iloc[0] if rows_g.outcome.nunique() == 1 else "mixed"
-            chips.append(_tag(o, f"{g}: " + {"above": "above chance", "below": "below chance", "within": "within chance", "mixed": "nulls disagree", "unknown": "not testable"}[o]))
+            chips.append(_tag(o, f"{g}: {CHIP_LABELS[o]}"))
         out.append((_card(question, verdict, body, stat), (question, " ".join(chips), stat)))
     return out
 
 
-def hierarchy_card(d, group):
+def hierarchy_card(d, group, thin):
     title, anchor = "Is there a dominance hierarchy?", "hierarchy"
     path = d / f"hierarchy_{group}.csv"
     if not path.exists():
@@ -151,31 +256,33 @@ def hierarchy_card(d, group):
     main = t[t.group.str.startswith(group.split("_")[0])]
     st = main[main.statistic == "steepness"]
     outs = [_outcome(r.observed, r.null_mean, r.p) for r in st.itertuples()]
-    steep = [g for g, o in zip(st.group, outs) if o == "above"]
-    flat = [g for g, o in zip(st.group, outs) if o != "above"]
+    steep = [g for g, o in zip(st.group, outs) if o == "above" and g not in thin]
+    flat = [g for g, o in zip(st.group, outs) if o != "above" and g not in thin]
     verdict = (_chip("above") + f" Steeper than chance in {esc(', '.join(steep))}. " if steep else "") + (_chip("within") + f" Not distinguishable from chance in {esc(', '.join(flat))}." if flat else "")
+    verdict = (verdict or _chip("thin") + " Every group has too few agents a day to judge.") + _thin_note(thin, st.group)
     rows = pd.DataFrame(
         {
             "group": main.group, "statistic": main.statistic.str.replace("_", " "), "observed": main.observed, "null mean": main.null_mean,
             "null 95% band": [f"[{a:.3f}, {b:.3f}]" for a, b in zip(main.null_lo, main.null_hi)], "p": [_p(p) for p in main.p],
-            "": [_chip(_outcome(r.observed, r.null_mean, r.p)) for r in main.itertuples()],
+            "": [_chip("thin") if g in thin else _chip(_outcome(r.observed, r.null_mean, r.p)) for g, r in zip(main.group, main.itertuples())],
         }
     )
     per = main.drop_duplicates("group")
     corr = pd.DataFrame({"group": per.group, "agents": per.agents, "directives": per.contests, "complied with": per.compliance, "rank vs release date": per.rank_vs_release_date, "rank vs message count": per.rank_vs_messages})
     body = '<p class="meaning">A contest is a directive addressed to a named agent: the sender wins if the target complies, the target wins if it declines or ignores it. Null: outcomes shuffled among contests within room and day.</p>'
-    body += _table(rows, raw=("p", "")) + _img(d / f"fig_hierarchy_{group}.png")
-    body += "<h3>Does rank follow capability or talkativeness?</h3>" + _table(corr, {"complied with": ".0%", "rank vs release date": "+.2f", "rank vs message count": "+.2f"})
+    body += _table(rows, raw=("p", ""), classes=["thin" if g in thin else "" for g in main.group]) + _fig("hierarchy", grouped=True)
+    body += "<h3>Does rank follow capability or talkativeness?</h3>" + _table(corr, {"complied with": ".0%", "rank vs release date": "+.2f", "rank vs message count": "+.2f"}, classes=["thin" if g in thin else "" for g in per.group])
+    body += "<h3>Who ranks highest</h3>" + _fig("ranks", grouped=True)
     ranks_path = d / f"hierarchy_ranks_{group}.csv"
     if ranks_path.exists():
         r = pd.read_csv(ranks_path)
         top = r.groupby("group", sort=False).head(5)[["group", "agent", "davids_score", "directives_sent", "obeyed", "directives_received", "messages"]]
-        body += _drawer("Who ranks highest (top five per group and episode)", _table(top, {"davids_score": ".2f", "obeyed": ".0f"}))
+        body += _drawer("The top five per group and episode, as a table", _table(top, {"davids_score": ".2f", "obeyed": ".0f"}))
     episodes = t[~t.group.isin(main.group) & (t.statistic == "steepness")]
     if len(episodes):
         e = pd.DataFrame({"episode | window": episodes.group, "steepness": episodes.observed, "null mean": episodes.null_mean, "p": [_p(p) for p in episodes.p], "directives": episodes.contests})
         body += _drawer("Before, during and after an imposed leader", _table(e, raw=("p",)))
-    chips = " ".join(_tag(o if o == "above" else "within", f"{g}: " + ("steeper than chance" if o == "above" else "no hierarchy beyond chance")) for g, o in zip(st.group, outs))
+    chips = " ".join(_tag("thin", f"{g}: thin") if g in thin else _tag(o if o == "above" else "within", f"{g}: " + ("steeper than chance" if o == "above" else "no hierarchy beyond chance")) for g, o in zip(st.group, outs))
     return _card(title, verdict, body, anchor), (title, chips, anchor)
 
 
@@ -198,7 +305,7 @@ def _exchange(r):
     )
 
 
-def helping_cards(d):
+def helping_cards(d, thin):
     t1, a1, t2, a2 = "What explains who answers whom?", "helping", "Is there a bystander effect?", "bystander"
     if not (d / "helping_ladder.csv").exists():
         return [_missing(t1, "swarm-sna label, then helping", a1), _missing(t2, "swarm-sna label, then helping", a2)]
@@ -211,7 +318,7 @@ def helping_cards(d):
     body = '<p class="meaning">One row per request and agent present. Nested logistic models, scored out of sample (held out by responder) as a share of the gain a lookup table achieves over the base rate.</p>'
     if summary:
         body += f'<p class="meaning">{summary["requests"]:,} requests, {summary["dyad_rows"]:,} request-agent pairs. An agent addressed by name answers {summary["addressed_rate"]:.0%} of the time; one not addressed, {summary["not_addressed_rate"]:.0%}.</p>'
-    body += _table(rows, {"log loss": ".4f", "completeness": ".2f"}) + _img(d / "fig_helping_ladder.png")
+    body += _fig("ladder") + _table(rows, {"log loss": ".4f", "completeness": ".2f"})
     if (d / "helping_coefficients.csv").exists():
         c = pd.read_csv(d / "helping_coefficients.csv", index_col=0).T.rename(columns=FEATURE_NAMES).reset_index(names="fit")
         note = f'<p class="meaning">Log-odds coefficients of the full model, refitted each way a pooled fit could mislead. {esc(summary.get("top_asker", "One agent"))} alone asks {summary.get("top_asker_share", 0):.0%} of all requests, hence the equal-weight row.</p>' if summary else ""
@@ -230,7 +337,8 @@ def helping_cards(d):
     label = {"below": "yes: each agent answers less in a larger group", "above": "no: each agent answers more in a larger group", "within": "no clear effect of group size", "unknown": "slope not computed"}[o]
     verdict = _tag(o, label) + (f" Slope of the log-odds that an agent answers on log group size, within goal: {s:.2f} [{lo:.2f}, {hi:.2f}]." if o != "unknown" else "")
     rows = curve.rename(columns={"size": "agents present", "p_each_agent_responds": "a given agent answers", "p_any_agent_responds": "anyone answers"})
-    body = '<p class="meaning">Broadcast requests only, compared within era, because group size and era are confounded across eras.</p>' + _table(rows, {"a given agent answers": ".0%", "anyone answers": ".0%"}) + _img(d / "fig_bystander.png")
+    body = '<p class="meaning">Broadcast requests only, compared within era, because group size and era are confounded across eras.</p>' + _fig("bystander", grouped=True)
+    body += _drawer("The curve as a table", _table(rows, {"a given agent answers": ".0%", "anyone answers": ".0%"}))
     cards.append((_card(t2, verdict, body, a2), (t2, _tag(o, label), a2)))
     return cards
 
@@ -268,22 +376,48 @@ def diffusion_card(d):
     label = "adoption follows ties" if o == "above" else "no more than chance"
     verdict = _tag(o, label) + f" {len(t)} items (links, file names, backticked terms) that spread to {MIN_AD}+ agents. The next adopter ranks <b>{t.observed.mean():.2f}</b> among the agents still to adopt, by ties to those who already had (0.50 by chance). In {share:.1%} of items the order leans on ties more than random orders do (5% expected by chance); combined z = {stouffer:+.1f}."
     body = '<p class="meaning">Order-of-acquisition diffusion analysis as a rank test (Franz &amp; Nunn 2009; Hoppitt &amp; Laland 2013). For each item, agents are ordered by first use. At each adoption the adopter is ranked, by tie weight to the agents who already adopted, among the agents who had not yet (0 = least tied, 1 = most); the statistic is the mean rank, and the null permutes the order among the same agents. Ties are mentions in the month before the item first appeared. An item has few adoptions, so single-item tests are weak; the pooled rank and the combined z carry the evidence.</p>'
-    body += _img(d / "fig_diffusion.png")
+    body += _fig("diffusion_items")
     body += '<p class="meaning">Read with care in a shared chat room: every agent sees every message, so access to an item is not gated by ties the way it is in an animal group. The test asks whether attention ties predict who picks something up next, not whether they were needed to hear of it.</p>'
     top = t.nsmallest(8, "p")[["item", "adopters", "first_adopter", "spread_days", "observed", "z", "p"]].rename(columns={"spread_days": "days to spread", "first_adopter": "first adopter", "observed": "adopter rank"})
     body += _drawer("The eight items whose spread leans most on ties", _table(top, {"days to spread": ".0f", "adopter rank": ".2f", "z": "+.2f", "p": ".3f"}))
-    return _card(title, verdict, body, anchor), (title, _tag(o, label), anchor)
+    chips = [_tag(o, label)]
+
+    net_path = d / "diffusion_network.json"
+    if net_path.exists() and (d / "diffusion_edges.csv").exists():
+        net = json.loads(net_path.read_text())
+        edges = pd.read_csv(d / "diffusion_edges.csv")
+        if net.get("edges"):
+            body += "<h3>Who adopts after whom: the diffusion network</h3>"
+            sig = int(net.get("significant_edges") or 0)
+            r, p = net.get("dyad_spearman"), net.get("dyad_qap_p")
+            same = "unknown" if r is None else "above" if (p is not None and p < ALPHA and r > 0) else "within"
+            same_label = "unknown" if r is None else "the same graph as attention" if same == "above" else "a different graph from attention"
+            text = f"The most recent earlier adopter of each item is taken as its source, which gives a network of {net['edges']:,} edges among {net['agents']} agents; <b>{sig}</b> of them pass q &lt; 0.1 against random adoption orders. "
+            if r is not None:
+                text += f"Over the {net.get('dyads', 0):,} pairs of agents that adopted an item in common, this network correlates <b>{r:+.2f}</b> (Spearman) with how often the two mention each other, QAP p = {p if p is None else format(p, '.3f')}. "
+            text += "Node-level: how often an agent is the source correlates " + f"{net.get('node_spearman_source_vs_mention_in', float('nan')):+.2f} with mentions received and {net.get('node_spearman_source_vs_messages', float('nan')):+.2f} with messages sent."
+            body += f'<p class="verdict">{_tag(same, same_label)} {text}</p>' + _fig("diffusion_network")
+            e = edges.nsmallest(12, "p")[["source", "target", "items", "co_adopted", "null_mean", "z", "q"]]
+            body += _drawer("The twelve edges least likely under random order", _table(e, {"null_mean": ".2f", "z": "+.2f", "q": ".3f"}))
+            if (d / "diffusion_nodes.csv").exists():
+                n = pd.read_csv(d / "diffusion_nodes.csv").head(10)
+                body += _drawer("Originators and followers: the ten agents most often the source", _table(n, {"mean_rank": ".2f"}))
+            chips.append(_tag(same, same_label))
+    return _card(title, verdict, body, anchor), (title, " ".join(chips), anchor)
 
 
-def trends_card(d, group):
+def trends_card(d, has_timeline):
     title, anchor = "How does the network change over time?", "time"
-    figs = _img(d / f"network_{group}.png", "The mention network per group; strongest ties only.")
-    figs += _img(d / "fig_network_timeline_mentions.png", "Who mentions whom, per quarter. Each agent keeps its place on the circle, in order of joining.")
-    figs += _img(d / "fig_network_timeline_help.png", "Who answers whose requests, per quarter.")
-    figs += _img(d / "fig_trends.png", "The weekly series behind the pooled numbers.")
-    if not figs:
+    body = ""
+    if has_timeline:
+        body += "<h3>The network, week by week</h3>" + _fig("timeline")
+    if (d / "trends_weekly.csv").exists():
+        body += "<h3>The weekly series behind the pooled numbers</h3>" + _fig("trends")
+        w = pd.read_csv(d / "trends_weekly.csv")
+        body += _drawer("The weekly series as a table", _table(w.rename(columns=lambda c: c.replace("_", " ")), {c.replace("_", " "): ".0%" for c in ("answered", "each_agent_responds", "compliance", "backed")} | {"requests per 100": ".1f"}))
+    if not body:
         return _missing(title, "swarm-sna report, then trends", anchor)
-    body = '<p class="meaning">A pooled statistic over a long transcript mixes regimes. These views show whether a result is a property of the swarm or of one period.</p>' + figs
+    body = '<p class="meaning">A pooled statistic over a long transcript mixes regimes. These views show whether a result is a property of the swarm or of one period.</p>' + body
     if (d / "trends_goal_type.csv").exists():
         g = pd.read_csv(d / "trends_goal_type.csv").rename(columns=lambda c: c.replace("_", " "))
         body += _drawer("Response rates by the kind of goal the swarm was given", _table(g, {c: ".0%" for c in g.columns if "respond" in c or "answered" in c}))
@@ -319,55 +453,64 @@ def quality_card(d, validation):
     return _card(title, "Every number above rests on these layers.", body, anchor), (title, _tag("info", "see checks"), anchor)
 
 
-# ---------- page
+# ---------- the data behind the figures
 
-CSS = """
-:root { --bg:#f6f6f4; --card:#ffffff; --ink:#1f2328; --muted:#5b6470; --line:#e2e4e8; --above:#2a78d6; --below:#c2410c; --within:#6b7280;
-  --above-bg:#e6f0fb; --below-bg:#fbeadf; --within-bg:#eceef1; --ok:#0f7a52; --ok-bg:#e2f4ec; }
-* { box-sizing: border-box; }
-body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
-main, header, footer { max-width: 1000px; margin: 0 auto; padding: 0 16px; }
-header { padding-top: 36px; }
-h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
-h2 { font-size: 19px; margin: 0 0 8px; }
-h3 { font-size: 14px; margin: 18px 0 6px; color: var(--muted); font-weight: 600; }
-.sub { color: var(--muted); margin: 0 0 20px; }
-.tiles { display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin: 0 0 18px; }
-.tile { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
-.tile b { display:block; font-size:21px; font-variant-numeric: tabular-nums; }
-.tile span { color:var(--muted); font-size:12.5px; }
-.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin: 0 0 16px; }
-.verdict { font-size: 15.5px; margin: 0 0 12px; }
-.meaning { color: var(--muted); font-size: 13.5px; margin: 0 0 10px; }
-.chip { display:inline-block; font-size:12px; font-weight:600; padding:1px 9px; border-radius:99px; white-space:nowrap; }
-.chip.above { background:var(--above-bg); color:#174e91; } .chip.below { background:var(--below-bg); color:#8a2f0a; }
-.chip.within, .chip.unknown, .chip.info, .chip.mixed { background:var(--within-bg); color:#3d4450; }
-.glance { list-style:none; padding:0; margin:0; } .glance li { padding:7px 0; border-top:1px solid var(--line); display:flex; gap:10px; align-items:baseline; }
-.glance li:first-child { border-top:0; } .glance a { color:var(--ink); text-decoration:none; flex: 0 0 43%; font-weight:600; } .glance a:hover { text-decoration:underline; }
-.glance .chips { display:flex; flex-wrap:wrap; gap:5px; }
-@media (max-width: 640px) { .glance li { flex-direction:column; gap:4px; } }
-.scroll { overflow-x:auto; } table { border-collapse:collapse; width:100%; font-size:13px; margin: 4px 0 12px; }
-th { text-align:left; color:var(--muted); font-weight:600; border-bottom:1px solid var(--line); padding:5px 10px 5px 0; white-space:nowrap; }
-td { padding:5px 10px 5px 0; border-bottom:1px solid var(--line); vertical-align:top; } td.num { font-variant-numeric: tabular-nums; }
-figure { margin: 10px 0 6px; } img { max-width:100%; height:auto; border:1px solid var(--line); border-radius:8px; background:#fff; }
-figcaption { color:var(--muted); font-size:12.5px; margin-top:4px; }
-details { border-top:1px solid var(--line); margin-top:10px; padding-top:8px; } summary { cursor:pointer; font-weight:600; font-size:13.5px; }
-.exchange { border-left:3px solid var(--line); padding:2px 0 2px 12px; margin:12px 0; }
-.who { font-size:12.5px; color:var(--muted); margin:6px 0 2px; } blockquote { margin:0 0 4px; font-size:13.5px; white-space:pre-wrap; overflow-wrap:anywhere; }
-.backing { font-size:13px; margin:4px 0 0; overflow-wrap:anywhere; } .tag { font-size:11.5px; font-weight:600; padding:1px 7px; border-radius:99px; margin-right:4px; }
-.tag.ok { background:var(--ok-bg); color:var(--ok); } .tag.bare { background:var(--below-bg); color:#8a2f0a; }
-code { background:var(--within-bg); padding:1px 5px; border-radius:4px; font-size:12.5px; }
-footer { color:var(--muted); font-size:12.5px; padding-bottom:40px; }
-"""
+def _csv(path):
+    return _records(pd.read_csv(path)) if path.exists() else None
 
 
-def run(in_dir, title=None, group="era", validation="validation"):
+def payload(d, group, groups, msgs, events, agents, mentions, req, resp):
+    fam_present = set(agents.family.dropna())
+    family_order = [f for f in NAMED_FAMILIES if f in fam_present]
+    for f, _ in agents.family.value_counts().items():
+        if len(family_order) >= 3:
+            break
+        if f not in family_order and f != "unknown":
+            family_order.append(f)
+    out = {
+        "group_label": group, "groups": groups, "palette": PALETTE, "family_order": family_order, "families": dict(zip(agents.agent, agents.family)),
+        "nulls": None, "networks": {}, "timeline": None, "helping": None, "hierarchy": None, "trends": None, "diffusion": None,
+    }
+    rep = d / f"report_{group}.csv"
+    if rep.exists():
+        t = pd.read_csv(rep)
+        draws_path = d / f"report_{group}_draws.json"
+        out["nulls"] = {
+            "table": _records(t[t.null.isin(NULL_NAMES)]), "stats": [{"key": k, "label": STAT_LABELS[k]} for k in [s for s, _, _ in NETWORK_CARDS]], "null_names": NULL_NAMES,
+            "draws": json.loads(draws_path.read_text()) if draws_path.exists() else None,
+        }
+    if mentions is not None:
+        out["networks"] = networks_payload(msgs, mentions, agents, group)
+        out["timeline"] = timeline_payload(events, msgs, mentions, agents, group, req, resp)
+    if (d / "helping_ladder.csv").exists():
+        summary = json.loads((d / "helping_summary.json").read_text()) if (d / "helping_summary.json").exists() else {}
+        out["helping"] = {"ladder": _csv(d / "helping_ladder.csv"), "bystander": _csv(d / "helping_bystander.csv") or [], "sizes": list(SIZE_LABELS), "slope": summary.get("bystander_slope"), "summary": summary}
+    if (d / f"hierarchy_{group}.csv").exists():
+        out["hierarchy"] = {"table": _csv(d / f"hierarchy_{group}.csv"), "ranks": _csv(d / f"hierarchy_ranks_{group}.csv") or []}
+    if (d / "trends_weekly.csv").exists():
+        w = pd.read_csv(d / "trends_weekly.csv")
+        out["trends"] = {"weekly": _records(w), "series": [list(s) for s in TREND_SERIES], "era_starts": {str(_clean(e)): wk for e, wk in w.dropna(subset=["era"]).groupby("era").week.min().items()}}
+    if (d / "diffusion_items.csv").exists():
+        net = d / "diffusion_network.json"
+        out["diffusion"] = {"items": _csv(d / "diffusion_items.csv"), "edges": _csv(d / "diffusion_edges.csv") or [], "nodes": _csv(d / "diffusion_nodes.csv") or [], "network": json.loads(net.read_text()) if net.exists() else None}
+    return out
+
+
+def _static(name):
+    return (STATIC / name).read_text().replace("</script", "<\\/script")
+
+
+def run(in_dir, title=None, group="era", validation="validation", min_agents=MIN_AGENTS):
     d = Path(in_dir)
-    ev = pd.read_parquet(d / "events.parquet", columns=["ts", "day", "actor", "actor_class", "room", "type"])
+    ev = pd.read_parquet(d / "events.parquet")
+    agents = pd.read_parquet(d / "agents.parquet")
     msgs = ev[ev.type == "message"]
-    agents = msgs[msgs.actor_class == "agent"]
+    amsgs = msgs[msgs.actor_class == "agent"]
+    mentions = pd.read_parquet(d / "mentions.parquet") if (d / "mentions.parquet").exists() else None
     req, resp = _load_all(d, "requests"), _load_all(d, "responses")
-    tiles = [(f"{len(msgs):,}", "messages"), (f"{agents.actor.nunique()}", "agents"), (f"{msgs.day.nunique()}", "active days"), (f"{msgs.room.nunique()}", "rooms")]
+    groups = group_info(amsgs, group, min_agents)
+    thin = {g["name"] for g in groups if g["thin"]}
+    tiles = [(f"{len(msgs):,}", "messages"), (f"{amsgs.actor.nunique()}", "agents"), (f"{msgs.day.nunique()}", "active days"), (f"{msgs.room.nunique()}", "rooms")]
     if req is not None:
         tiles.append((f"{len(req):,}", "requests found"))
     if resp is not None:
@@ -378,18 +521,27 @@ def run(in_dir, title=None, group="era", validation="validation"):
         rep = pd.read_csv(d / f"report_{group}.csv")
         if "permutations" in rep.columns:
             n_perm = int(rep.permutations.iloc[0])
-    cards = network_cards(d, group) + [hierarchy_card(d, group)] + helping_cards(d) + [evidence_card(d), diffusion_card(d), trends_card(d, group), quality_card(d, validation)]
+    data = payload(d, group, groups, amsgs, ev, agents, mentions, req, resp)
+    cards = network_cards(d, group, thin) + [hierarchy_card(d, group, thin)] + helping_cards(d, thin) + [evidence_card(d), diffusion_card(d), trends_card(d, data["timeline"] is not None), quality_card(d, validation)]
     cards = [c for c in cards if c]
     glance = "".join(f'<li><a href="#{a}">{esc(t)}</a><span class="chips">{chips}</span></li>' for _, (t, chips, a) in cards)
+    thin_text = ""
+    if thin:
+        parts = ", ".join(f"{g['name']} ({g['median_active']:.0f})" for g in groups if g["thin"])
+        thin_text = f" A group whose median day has fewer than {min_agents} agents is shown but not judged: {esc(parts)}."
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Swarm report card</title><style>{CSS}</style></head><body>
+<title>Swarm report card</title><style>{_static("card.css")}</style></head><body>
 <header><h1>Swarm report card</h1><p class="sub">{esc(title or d.name)} &middot; {esc(str(msgs.day.min()))} to {esc(str(msgs.day.max()))}</p>
-<div class="tiles">{"".join(f'<div class="tile"><b>{v}</b><span>{esc(k)}</span></div>' for v, k in tiles)}</div></header>
+<div class="tiles">{"".join(f'<div class="tile"><b>{v}</b><span>{esc(k)}</span></div>' for v, k in tiles)}</div>
+<div class="groupbar" id="groupbar"></div></header>
 <main>
-<article class="card"><h2>At a glance</h2><p class="meaning">The questions worth asking of any group of agents. A pattern only counts if it beats a null model: the raw event stream is shuffled {n_perm:,} times in ways that keep how much each agent talks, and the statistic is recomputed on each shuffle. Two shuffles are used. One reassigns who spoke each message; the other reassigns whom each message addressed. They can disagree, and when they do the card says so.</p><ul class="glance">{glance}</ul></article>
+<article class="card"><h2>At a glance</h2><p class="meaning">The questions worth asking of any group of agents. A pattern only counts if it beats a null model: the raw event stream is shuffled {n_perm:,} times in ways that keep how much each agent talks, and the statistic is recomputed on each shuffle. Two shuffles are used. One reassigns who spoke each message; the other reassigns whom each message addressed. They can disagree, and when they do the card says so.{thin_text}</p><ul class="glance">{glance}</ul></article>
 {"".join(c for c, _ in cards)}
 </main>
-<footer>Generated by swarm-sna. Null models follow Bejder et al. 1998 and Farine 2017; dominance measures follow de Vries et al. 2006 and Shizuka &amp; McDonald 2012.</footer>
+<footer>Generated by swarm-sna. Null models follow Bejder et al. 1998 and Farine 2017; dominance measures follow de Vries et al. 2006 and Shizuka &amp; McDonald 2012. Figures drawn with D3 (Mike Bostock, ISC licence).</footer>
+<script id="card-data" type="application/json">{json.dumps(_clean(data), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")}</script>
+<script>{_static("d3.v7.min.js")}</script>
+<script>{_static("card.js")}</script>
 </body></html>"""
     out = d / "report_card.html"
     out.write_text(page)
